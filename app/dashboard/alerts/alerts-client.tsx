@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-import dynamic from "next/dynamic"
 import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,17 +20,8 @@ import {
   ArrowDown,
   ArrowUp,
   LayoutDashboard,
-  Loader2,
 } from "lucide-react"
-
-const AlertChart = dynamic(() => import("./alert-chart"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-full items-center justify-center">
-      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-    </div>
-  ),
-})
+import AlertChart from "./alert-chart"
 
 type AlertType = "score_drop" | "competitor_rise" | "rank_change" | "milestone" | "system"
 type AlertSeverity = "high" | "medium" | "low"

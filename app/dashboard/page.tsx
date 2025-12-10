@@ -84,7 +84,9 @@ export default function DashboardPage() {
         <CardContent>
           {competitors.map((c) => (
             <div key={c.name} className="flex justify-between p-2">
-              <span>{c.rank}. {c.name}</span>
+              <span>
+                {c.rank}. {c.name}
+              </span>
               <span>{c.score}</span>
             </div>
           ))}
