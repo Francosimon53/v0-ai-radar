@@ -3,12 +3,14 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Radar, Eye, EyeOff, Loader2, Check, X } from "lucide-react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
 
 export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -21,6 +23,8 @@ export default function SignupPage() {
   })
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const router = useRouter()
+  const [authError, setAuthError] = useState<string | null>(null)
 
   const passwordStrength = {
     length: formData.password.length >= 8,
@@ -50,9 +54,40 @@ export default function SignupPage() {
     }
 
     setErrors({})
+    setAuthError(null)
     setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setIsLoading(false)
+
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          emailRedirectTo:
+            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard/setup`,
+          data: {
+            full_name: formData.name,
+            company: formData.company,
+          },
+        },
+      })
+
+      if (error) {
+        setAuthError(error.message)
+        setIsLoading(false)
+        return
+      }
+
+      if (data.session) {
+        router.push("/dashboard/setup")
+      } else {
+        setAuthError("Check your email to confirm your account before signing in.")
+      }
+    } catch (err) {
+      setAuthError("An unexpected error occurred. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const strengthColors = {
@@ -78,6 +113,14 @@ export default function SignupPage() {
           <h1 className="text-2xl font-bold">Start your free trial</h1>
           <p className="text-muted-foreground mt-2">No credit card required</p>
         </div>
+
+        {authError && (
+          <div
+            className={`mb-4 p-3 rounded-lg text-sm ${authError.includes("Check your email") ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-destructive/10 text-destructive border border-destructive/20"}`}
+          >
+            {authError}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

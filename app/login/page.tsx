@@ -3,12 +3,14 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Radar, Eye, EyeOff, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -16,6 +18,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
+  const router = useRouter()
+  const [authError, setAuthError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,10 +35,31 @@ export default function LoginPage() {
     }
 
     setErrors({})
+    setAuthError(null)
     setIsLoading(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setIsLoading(false)
+
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        setAuthError(error.message)
+        setIsLoading(false)
+        return
+      }
+
+      if (data.session) {
+        router.push("/dashboard")
+        router.refresh()
+      }
+    } catch (err) {
+      setAuthError("An unexpected error occurred. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -48,6 +73,12 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold">Welcome back</h1>
           <p className="text-muted-foreground mt-2">Sign in to your account</p>
         </div>
+
+        {authError && (
+          <div className="mb-4 p-3 rounded-lg text-sm bg-destructive/10 text-destructive border border-destructive/20">
+            {authError}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
