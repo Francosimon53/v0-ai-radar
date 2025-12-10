@@ -31,3 +31,6 @@ export function createServiceClient() {
     },
   })
 }
+
+export { createServerClient as createUserClient }
+export { createServiceClient as createServiceRoleClient }
