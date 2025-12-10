@@ -1,9 +1,21 @@
 import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+let resendClient: Resend | null = null
+
+function getResendClient(): Resend {
+  if (!resendClient) {
+    const apiKey = process.env.RESEND_API_KEY
+    if (!apiKey) {
+      throw new Error("RESEND_API_KEY environment variable is not set")
+    }
+    resendClient = new Resend(apiKey)
+  }
+  return resendClient
+}
 
 export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
   try {
+    const resend = getResendClient()
     const { error } = await resend.emails.send({
       from: "AI Vibes Radar <notifications@aivibesradar.com>",
       to,
@@ -23,4 +35,4 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
   }
 }
 
-export { resend }
+export { getResendClient as resend }
