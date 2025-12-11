@@ -1,13 +1,13 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Radar, ArrowLeft, Loader2, Mail, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
+import { createBrowserClient } from "@/lib/supabase/client"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -29,8 +29,19 @@ export default function ForgotPasswordPage() {
 
     setError("")
     setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+
+    const supabase = createBrowserClient()
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+    })
+
     setIsLoading(false)
+
+    if (resetError) {
+      setError(resetError.message)
+      return
+    }
+
     setIsSubmitted(true)
   }
 
