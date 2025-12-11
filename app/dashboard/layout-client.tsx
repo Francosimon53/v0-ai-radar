@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
+import { useTheme } from "next-themes"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -88,8 +89,9 @@ export default function DashboardLayoutClient({
   const pathname = usePathname()
   const router = useRouter()
   const { toast } = useToast()
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [darkMode, setDarkMode] = useState(true)
   const [isRunningAnalysis, setIsRunningAnalysis] = useState(false)
 
   const [userData, setUserData] = useState<UserData>({
@@ -109,6 +111,10 @@ export default function DashboardLayoutClient({
   const [isLoading, setIsLoading] = useState(true)
 
   const currentPage = pageInfo[pathname] || pageInfo["/dashboard"]
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     async function loadSidebarData() {
@@ -183,9 +189,8 @@ export default function DashboardLayoutClient({
     loadSidebarData()
   }, [pathname]) // Refetch when navigating
 
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode)
-    document.documentElement.classList.toggle("dark")
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark")
   }
 
   const runAnalysis = async () => {
@@ -422,8 +427,8 @@ export default function DashboardLayoutClient({
               </Link>
             </Button>
 
-            <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
-              {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            <Button variant="ghost" size="icon" onClick={toggleTheme}>
+              {mounted && theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
           </div>
         </header>
