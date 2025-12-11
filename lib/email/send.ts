@@ -8,7 +8,7 @@ import { ReportReadyEmail } from "./templates/report-ready"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import type { AnalysisResult } from "@/lib/analysis/types"
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://aivibesradar.com"
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://ai-viber-radar.app"
 
 interface UserData {
   id: string
