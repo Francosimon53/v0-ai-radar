@@ -55,7 +55,8 @@ export async function POST(request: Request) {
       const { data, error } = await supabase
         .from("tracking_configs")
         .update({
-          brand,
+          name: brand,
+          primary_brand: brand,
           competitors,
           industry,
           updated_at: new Date().toISOString(),
@@ -75,7 +76,8 @@ export async function POST(request: Request) {
         .from("tracking_configs")
         .insert({
           user_id: user.id,
-          brand,
+          name: brand,
+          primary_brand: brand,
           competitors,
           industry,
           frequency: "weekly",
