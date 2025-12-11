@@ -15,6 +15,9 @@ import {
   BarChart3,
   ArrowUpRight,
   ArrowDownRight,
+  Compass,
+  Rocket,
+  CheckCircle2,
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts"
 import Link from "next/link"
@@ -47,11 +50,30 @@ interface DashboardData {
   }
 }
 
+interface PlanSummary {
+  northStarGoal: string
+  quickWins: Array<{
+    id: string
+    title: string
+    description: string
+  }>
+}
+
+interface AnalysisResult {
+  success: boolean
+  analysisId: string
+  brandScore: number
+  processingTime: number
+  remaining: number
+  planSummary?: PlanSummary
+}
+
 export default function DashboardClient() {
   const { toast } = useToast()
   const [data, setData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRunningAnalysis, setIsRunningAnalysis] = useState(false)
+  const [latestAnalysis, setLatestAnalysis] = useState<AnalysisResult | null>(null)
 
   useEffect(() => {
     loadDashboardData()
@@ -103,6 +125,8 @@ export default function DashboardClient() {
       if (!response.ok) {
         throw new Error(result.error || result.message || "Analysis failed")
       }
+
+      setLatestAnalysis(result)
 
       toast({
         title: "Analysis Complete",
@@ -291,6 +315,65 @@ export default function DashboardClient() {
                   </>
                 )}
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {latestAnalysis?.planSummary && (
+        <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 via-card to-card">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Compass className="h-4 w-4 text-primary" />
+              </div>
+              <CardTitle className="text-lg">Strategic Plan</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* North Star Goal */}
+            <div className="p-4 bg-primary/10 rounded-xl border border-primary/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="h-5 w-5 text-primary" />
+                <span className="text-sm font-medium text-primary uppercase tracking-wide">North Star Goal</span>
+              </div>
+              <p className="text-lg font-semibold text-foreground">{latestAnalysis.planSummary.northStarGoal}</p>
+            </div>
+
+            {/* Quick Wins */}
+            {latestAnalysis.planSummary.quickWins && latestAnalysis.planSummary.quickWins.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Rocket className="h-5 w-5 text-primary" />
+                  <span className="font-semibold">Quick Wins (Next 7 Days)</span>
+                </div>
+                <div className="space-y-3">
+                  {latestAnalysis.planSummary.quickWins.map((win, idx) => (
+                    <div
+                      key={win.id || idx}
+                      className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors"
+                    >
+                      <div className="h-6 w-6 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{win.title}</p>
+                        <p className="text-sm text-muted-foreground mt-0.5">{win.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* View Full Plan CTA */}
+            <div className="flex justify-end pt-2">
+              <Link href="/dashboard/reports">
+                <Button variant="ghost" size="sm" className="gap-1 text-primary">
+                  View Full Strategic Plan
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>
