@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -37,27 +37,21 @@ import {
   Clock,
   FileText,
   CheckCircle,
+  Loader2,
 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 type SettingsTab = "profile" | "tracking" | "notifications" | "billing"
-
-// Sample user data
-const userData = {
-  name: "John Doe",
-  email: "john@company.com",
-  company: "Nike Inc.",
-  avatar: "/professional-man-avatar.png",
-}
 
 const planData = {
   name: "Professional",
   price: 79,
   billingCycle: "monthly",
   nextBilling: "January 15, 2025",
-  usage: {
-    brands: { used: 3, limit: 5 },
-    competitors: { used: 12, limit: 20 },
-    analyses: { used: 45, limit: 100 },
+  limits: {
+    brands: 5,
+    competitors: 20,
+    analyses: 100,
   },
 }
 
@@ -68,26 +62,30 @@ const invoiceHistory = [
   { id: "INV-004", date: "Sep 15, 2024", amount: 79, status: "paid" },
 ]
 
-const brandConfig = {
-  name: "Nike",
-  competitors: ["Adidas", "Under Armour", "Puma", "New Balance"],
-  industry: "Athletic Footwear",
-}
-
 export default function SettingsClient() {
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile")
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [newCompetitor, setNewCompetitor] = useState("")
-  const [competitors, setCompetitors] = useState(brandConfig.competitors)
 
   // Profile state
   const [profile, setProfile] = useState({
-    name: userData.name,
-    email: userData.email,
-    company: userData.company,
+    name: "",
+    email: "",
+    company: "",
+    avatar: "",
+  })
+
+  // Tracking state
+  const [tracking, setTracking] = useState({
+    brand: "",
+    competitors: [] as string[],
+    industry: "",
+    frequency: "weekly",
   })
 
   // Notification settings
@@ -104,27 +102,173 @@ export default function SettingsClient() {
     quietEnd: "08:00",
   })
 
-  // Tracking settings
-  const [tracking, setTracking] = useState({
-    analysisFrequency: "weekly",
-    nextAnalysis: "Dec 18, 2024 at 9:00 AM",
+  // Usage stats
+  const [usage, setUsage] = useState({
+    analyses: 0,
+    reports: 0,
   })
 
-  const handleSave = async () => {
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const response = await fetch("/api/settings")
+        if (!response.ok) throw new Error("Failed to load settings")
+
+        const data = await response.json()
+
+        if (data.profile) {
+          setProfile({
+            name: data.profile.full_name || "",
+            email: data.profile.email || "",
+            company: data.profile.company || "",
+            avatar: data.profile.avatar_url || "",
+          })
+        }
+
+        if (data.config) {
+          setTracking({
+            brand: data.config.brand || "",
+            competitors: data.config.competitors || [],
+            industry: data.config.industry || "",
+            frequency: data.config.frequency || "weekly",
+          })
+        }
+
+        if (data.alertSettings) {
+          setNotifications({
+            emailEnabled: data.alertSettings.email_enabled ?? true,
+            scoreDropEnabled: data.alertSettings.score_drop_enabled ?? true,
+            scoreDropThreshold: String(data.alertSettings.score_drop_threshold || 5),
+            competitorEnabled: data.alertSettings.competitor_alert_enabled ?? true,
+            competitorThreshold: String(data.alertSettings.competitor_threshold || 3),
+            weeklyDigest: data.alertSettings.weekly_digest ?? true,
+            digestDay: data.alertSettings.digest_day || "monday",
+            quietHoursEnabled: data.alertSettings.quiet_hours_enabled ?? false,
+            quietStart: data.alertSettings.quiet_start || "22:00",
+            quietEnd: data.alertSettings.quiet_end || "08:00",
+          })
+        }
+
+        if (data.usage) {
+          setUsage(data.usage)
+        }
+      } catch (error) {
+        console.error("Error loading settings:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load settings",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadSettings()
+  }, [toast])
+
+  const handleSaveProfile = async () => {
     setIsSaving(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsSaving(false)
+    try {
+      const response = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "profile",
+          data: profile,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to save profile")
+
+      toast({
+        title: "Profile saved",
+        description: "Your profile has been updated successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save profile",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSaveTracking = async () => {
+    setIsSaving(true)
+    try {
+      const response = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "tracking",
+          data: tracking,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to save tracking settings")
+
+      toast({
+        title: "Tracking settings saved",
+        description: "Your brand configuration has been updated.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save tracking settings",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSaveNotifications = async () => {
+    setIsSaving(true)
+    try {
+      const response = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "notifications",
+          data: notifications,
+        }),
+      })
+
+      if (!response.ok) throw new Error("Failed to save notification settings")
+
+      toast({
+        title: "Notification settings saved",
+        description: "Your preferences have been updated.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save notification settings",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const addCompetitor = () => {
-    if (newCompetitor && !competitors.includes(newCompetitor)) {
-      setCompetitors([...competitors, newCompetitor])
+    if (newCompetitor && !tracking.competitors.includes(newCompetitor)) {
+      setTracking({
+        ...tracking,
+        competitors: [...tracking.competitors, newCompetitor],
+      })
       setNewCompetitor("")
     }
   }
 
   const removeCompetitor = (comp: string) => {
-    setCompetitors(competitors.filter((c) => c !== comp))
+    setTracking({
+      ...tracking,
+      competitors: tracking.competitors.filter((c) => c !== comp),
+    })
   }
 
   const tabs = [
@@ -133,6 +277,14 @@ export default function SettingsClient() {
     { id: "notifications" as const, label: "Notifications", icon: Bell },
     { id: "billing" as const, label: "Billing", icon: CreditCard },
   ]
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -173,8 +325,13 @@ export default function SettingsClient() {
               <div className="flex items-center gap-6">
                 <div className="relative">
                   <Avatar className="h-20 w-20">
-                    <AvatarImage src={userData.avatar || "/placeholder.svg"} />
-                    <AvatarFallback className="bg-blue-600 text-xl">JD</AvatarFallback>
+                    <AvatarImage src={profile.avatar || "/placeholder.svg"} />
+                    <AvatarFallback className="bg-blue-600 text-xl">
+                      {profile.name
+                        ?.split(" ")
+                        .map((n) => n[0])
+                        .join("") || "U"}
+                    </AvatarFallback>
                   </Avatar>
                   <button className="absolute bottom-0 right-0 p-1.5 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors">
                     <Camera className="h-3.5 w-3.5 text-white" />
@@ -217,13 +374,27 @@ export default function SettingsClient() {
                   className="bg-background border-border"
                 />
               </div>
+
+              <Button onClick={handleSaveProfile} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
             </CardContent>
           </Card>
 
           {/* Password Change */}
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-foreground">Change Password</CardTitle>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                Change Password
+              </CardTitle>
               <CardDescription>Update your password to keep your account secure</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -242,451 +413,430 @@ export default function SettingsClient() {
                 </div>
               </div>
               <Button variant="outline" className="border-border bg-transparent">
-                <Lock className="h-4 w-4 mr-2" />
                 Update Password
               </Button>
             </CardContent>
           </Card>
 
           {/* Danger Zone */}
-          <Card className="border-red-500/30 bg-card">
+          <Card className="border-red-900/50 bg-card">
             <CardHeader>
-              <CardTitle className="text-red-400">Danger Zone</CardTitle>
-              <CardDescription>Irreversible account actions</CardDescription>
+              <CardTitle className="text-red-500 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Danger Zone
+              </CardTitle>
+              <CardDescription>Irreversible and destructive actions</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-lg bg-slate-800/50">
+              <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                 <div>
                   <p className="font-medium text-foreground">Export Your Data</p>
-                  <p className="text-sm text-muted-foreground">Download all your reports and settings</p>
+                  <p className="text-sm text-muted-foreground">Download all your data as a JSON file</p>
                 </div>
                 <Button variant="outline" className="border-border bg-transparent">
-                  <Download className="h-4 w-4 mr-2" />
+                  <Download className="mr-2 h-4 w-4" />
                   Export
                 </Button>
               </div>
-              <div className="flex items-center justify-between p-4 rounded-lg bg-red-500/10 border border-red-500/30">
+              <div className="flex items-center justify-between p-4 border border-red-900/50 rounded-lg">
                 <div>
                   <p className="font-medium text-foreground">Delete Account</p>
-                  <p className="text-sm text-muted-foreground">Permanently delete your account and data</p>
+                  <p className="text-sm text-muted-foreground">Permanently delete your account and all data</p>
                 </div>
-                <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Account
                 </Button>
               </div>
             </CardContent>
           </Card>
-
-          <div className="flex justify-end">
-            <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
         </div>
       )}
 
       {/* Tracking Tab */}
       {activeTab === "tracking" && (
         <div className="space-y-6">
-          {/* Brand Configuration */}
           <Card className="border-border bg-card">
             <CardHeader>
               <CardTitle className="text-foreground">Brand Configuration</CardTitle>
-              <CardDescription>Manage your tracked brand</CardDescription>
+              <CardDescription>Manage your brand and tracking settings</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="brand-name">Brand Name</Label>
-                <Input id="brand-name" defaultValue={brandConfig.name} className="bg-background border-border" />
+                <Label htmlFor="brand">Your Brand</Label>
+                <Input
+                  id="brand"
+                  value={tracking.brand}
+                  onChange={(e) => setTracking({ ...tracking, brand: e.target.value })}
+                  className="bg-background border-border"
+                />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="industry">Industry</Label>
-                <Select defaultValue={brandConfig.industry}>
+                <Select
+                  value={tracking.industry}
+                  onValueChange={(value) => setTracking({ ...tracking, industry: value })}
+                >
                   <SelectTrigger className="bg-background border-border">
-                    <SelectValue />
+                    <SelectValue placeholder="Select industry" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Athletic Footwear">Athletic Footwear</SelectItem>
-                    <SelectItem value="Technology">Technology</SelectItem>
-                    <SelectItem value="Fashion">Fashion</SelectItem>
-                    <SelectItem value="Food & Beverage">Food & Beverage</SelectItem>
-                    <SelectItem value="Finance">Finance</SelectItem>
+                    <SelectItem value="technology">Technology</SelectItem>
+                    <SelectItem value="finance">Finance & Banking</SelectItem>
+                    <SelectItem value="healthcare">Healthcare</SelectItem>
+                    <SelectItem value="retail">Retail & E-commerce</SelectItem>
+                    <SelectItem value="automotive">Automotive</SelectItem>
+                    <SelectItem value="food">Food & Beverage</SelectItem>
+                    <SelectItem value="fashion">Fashion & Apparel</SelectItem>
+                    <SelectItem value="travel">Travel & Hospitality</SelectItem>
+                    <SelectItem value="entertainment">Entertainment</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Competitors */}
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-foreground">Competitors</CardTitle>
-              <CardDescription>
-                Manage brands you&apos;re comparing against ({competitors.length}/{planData.usage.competitors.limit})
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {competitors.map((comp) => (
-                  <Badge key={comp} variant="secondary" className="bg-slate-800 text-foreground px-3 py-1.5">
-                    {comp}
-                    <button
-                      onClick={() => removeCompetitor(comp)}
-                      className="ml-2 hover:text-red-400 transition-colors"
+              <Separator />
+
+              <div className="space-y-4">
+                <Label>Competitors</Label>
+                <div className="flex flex-wrap gap-2">
+                  {tracking.competitors.map((competitor) => (
+                    <Badge
+                      key={competitor}
+                      variant="secondary"
+                      className="bg-slate-800 text-slate-200 px-3 py-1 text-sm"
                     >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
+                      {competitor}
+                      <button onClick={() => removeCompetitor(competitor)} className="ml-2 hover:text-red-400">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Add competitor..."
+                    value={newCompetitor}
+                    onChange={(e) => setNewCompetitor(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addCompetitor()}
+                    className="bg-background border-border"
+                  />
+                  <Button onClick={addCompetitor} variant="outline" className="border-border bg-transparent">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Add competitor..."
-                  value={newCompetitor}
-                  onChange={(e) => setNewCompetitor(e.target.value)}
-                  className="bg-background border-border"
-                  onKeyDown={(e) => e.key === "Enter" && addCompetitor()}
-                />
-                <Button
-                  variant="outline"
-                  className="border-border bg-transparent"
-                  onClick={addCompetitor}
-                  disabled={competitors.length >= planData.usage.competitors.limit}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
+
+              <Button onClick={handleSaveTracking} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Brand Settings"
+                )}
+              </Button>
             </CardContent>
           </Card>
 
-          {/* Analysis Frequency */}
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-foreground">Analysis Frequency</CardTitle>
-              <CardDescription>How often should we analyze your brand perception?</CardDescription>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Analysis Schedule
+              </CardTitle>
+              <CardDescription>Configure how often we analyze your brand</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <RadioGroup
-                value={tracking.analysisFrequency}
-                onValueChange={(v) => setTracking({ ...tracking, analysisFrequency: v })}
+                value={tracking.frequency}
+                onValueChange={(value) => setTracking({ ...tracking, frequency: value })}
+                className="space-y-3"
               >
-                <div className="flex items-center space-x-3 p-3 rounded-lg bg-slate-800/50">
-                  <RadioGroupItem value="daily" id="daily" disabled />
+                <div className="flex items-center space-x-3 p-3 border border-border rounded-lg hover:bg-slate-800/50 cursor-pointer">
+                  <RadioGroupItem value="daily" id="daily" />
                   <Label htmlFor="daily" className="flex-1 cursor-pointer">
-                    <span className="flex items-center gap-2">
-                      Daily
-                      <Badge className="bg-amber-500/20 text-amber-400 text-xs">Pro</Badge>
-                    </span>
-                    <span className="text-sm text-muted-foreground block">Run analysis every 24 hours</span>
+                    <span className="font-medium">Daily</span>
+                    <span className="block text-sm text-muted-foreground">Every day at 9:00 AM</span>
                   </Label>
+                  <Badge className="bg-blue-600">Pro</Badge>
                 </div>
-                <div className="flex items-center space-x-3 p-3 rounded-lg bg-slate-800/50">
+                <div className="flex items-center space-x-3 p-3 border border-border rounded-lg hover:bg-slate-800/50 cursor-pointer">
                   <RadioGroupItem value="weekly" id="weekly" />
                   <Label htmlFor="weekly" className="flex-1 cursor-pointer">
-                    Weekly
-                    <span className="text-sm text-muted-foreground block">Run analysis every 7 days</span>
+                    <span className="font-medium">Weekly</span>
+                    <span className="block text-sm text-muted-foreground">Every Monday at 9:00 AM</span>
                   </Label>
                 </div>
-                <div className="flex items-center space-x-3 p-3 rounded-lg bg-slate-800/50">
+                <div className="flex items-center space-x-3 p-3 border border-border rounded-lg hover:bg-slate-800/50 cursor-pointer">
                   <RadioGroupItem value="monthly" id="monthly" />
                   <Label htmlFor="monthly" className="flex-1 cursor-pointer">
-                    Monthly
-                    <span className="text-sm text-muted-foreground block">Run analysis every 30 days</span>
+                    <span className="font-medium">Monthly</span>
+                    <span className="block text-sm text-muted-foreground">1st of each month at 9:00 AM</span>
                   </Label>
                 </div>
               </RadioGroup>
 
-              <div className="flex items-center justify-between p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                <div className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 text-blue-400" />
-                  <div>
-                    <p className="font-medium text-foreground">Next Scheduled Analysis</p>
-                    <p className="text-sm text-muted-foreground">{tracking.nextAnalysis}</p>
-                  </div>
-                </div>
-                <Button variant="outline" className="border-border bg-transparent">
-                  Run Now
-                </Button>
-              </div>
+              <Button onClick={handleSaveTracking} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Schedule"
+                )}
+              </Button>
             </CardContent>
           </Card>
-
-          <div className="flex justify-end">
-            <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
         </div>
       )}
 
       {/* Notifications Tab */}
       {activeTab === "notifications" && (
         <div className="space-y-6">
-          {/* Email Notifications */}
           <Card className="border-border bg-card">
             <CardHeader>
               <CardTitle className="text-foreground">Email Notifications</CardTitle>
-              <CardDescription>Control which emails you receive</CardDescription>
+              <CardDescription>Choose what updates you receive via email</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-foreground">Enable Email Notifications</p>
-                  <p className="text-sm text-muted-foreground">Receive alerts and updates via email</p>
+                  <p className="font-medium text-foreground">Email Notifications</p>
+                  <p className="text-sm text-muted-foreground">Receive notifications via email</p>
                 </div>
                 <Switch
                   checked={notifications.emailEnabled}
-                  onCheckedChange={(v) => setNotifications({ ...notifications, emailEnabled: v })}
+                  onCheckedChange={(checked) => setNotifications({ ...notifications, emailEnabled: checked })}
                 />
               </div>
 
-              <Separator className="bg-border" />
+              <Separator />
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex-1">
+                  <div>
                     <p className="font-medium text-foreground">Score Drop Alerts</p>
-                    <p className="text-sm text-muted-foreground">Get notified when your score drops significantly</p>
+                    <p className="text-sm text-muted-foreground">Get notified when your score drops</p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <Switch
+                    checked={notifications.scoreDropEnabled}
+                    onCheckedChange={(checked) => setNotifications({ ...notifications, scoreDropEnabled: checked })}
+                    disabled={!notifications.emailEnabled}
+                  />
+                </div>
+                {notifications.scoreDropEnabled && (
+                  <div className="ml-4 flex items-center gap-2">
+                    <Label className="text-sm text-muted-foreground">Alert when score drops by</Label>
                     <Select
                       value={notifications.scoreDropThreshold}
-                      onValueChange={(v) => setNotifications({ ...notifications, scoreDropThreshold: v })}
-                      disabled={!notifications.scoreDropEnabled}
+                      onValueChange={(value) => setNotifications({ ...notifications, scoreDropThreshold: value })}
+                      disabled={!notifications.emailEnabled}
                     >
                       <SelectTrigger className="w-24 bg-background border-border">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="3">3+ pts</SelectItem>
-                        <SelectItem value="5">5+ pts</SelectItem>
-                        <SelectItem value="10">10+ pts</SelectItem>
+                        <SelectItem value="3">3+</SelectItem>
+                        <SelectItem value="5">5+</SelectItem>
+                        <SelectItem value="10">10+</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Switch
-                      checked={notifications.scoreDropEnabled}
-                      onCheckedChange={(v) => setNotifications({ ...notifications, scoreDropEnabled: v })}
-                    />
+                    <span className="text-sm text-muted-foreground">points</span>
                   </div>
-                </div>
+                )}
+              </div>
 
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex-1">
+                  <div>
                     <p className="font-medium text-foreground">Competitor Alerts</p>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified when competitors gain or lose significant ground
-                    </p>
+                    <p className="text-sm text-muted-foreground">Get notified about competitor changes</p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <Switch
+                    checked={notifications.competitorEnabled}
+                    onCheckedChange={(checked) => setNotifications({ ...notifications, competitorEnabled: checked })}
+                    disabled={!notifications.emailEnabled}
+                  />
+                </div>
+                {notifications.competitorEnabled && (
+                  <div className="ml-4 flex items-center gap-2">
+                    <Label className="text-sm text-muted-foreground">Alert when competitor rises by</Label>
                     <Select
                       value={notifications.competitorThreshold}
-                      onValueChange={(v) => setNotifications({ ...notifications, competitorThreshold: v })}
-                      disabled={!notifications.competitorEnabled}
+                      onValueChange={(value) => setNotifications({ ...notifications, competitorThreshold: value })}
+                      disabled={!notifications.emailEnabled}
                     >
                       <SelectTrigger className="w-24 bg-background border-border">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="3">3+ pts</SelectItem>
-                        <SelectItem value="5">5+ pts</SelectItem>
-                        <SelectItem value="10">10+ pts</SelectItem>
+                        <SelectItem value="3">3+</SelectItem>
+                        <SelectItem value="5">5+</SelectItem>
+                        <SelectItem value="10">10+</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Switch
-                      checked={notifications.competitorEnabled}
-                      onCheckedChange={(v) => setNotifications({ ...notifications, competitorEnabled: v })}
-                    />
+                    <span className="text-sm text-muted-foreground">points</span>
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Weekly Digest */}
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-foreground">Weekly Digest</CardTitle>
-              <CardDescription>Receive a summary of your brand performance</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-foreground">Enable Weekly Digest</p>
-                  <p className="text-sm text-muted-foreground">Get a comprehensive summary every week</p>
-                </div>
-                <Switch
-                  checked={notifications.weeklyDigest}
-                  onCheckedChange={(v) => setNotifications({ ...notifications, weeklyDigest: v })}
-                />
+                )}
               </div>
 
-              {notifications.weeklyDigest && (
-                <div className="space-y-2">
-                  <Label>Delivery Day</Label>
-                  <Select
-                    value={notifications.digestDay}
-                    onValueChange={(v) => setNotifications({ ...notifications, digestDay: v })}
-                  >
-                    <SelectTrigger className="bg-background border-border">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monday">Monday</SelectItem>
-                      <SelectItem value="tuesday">Tuesday</SelectItem>
-                      <SelectItem value="wednesday">Wednesday</SelectItem>
-                      <SelectItem value="thursday">Thursday</SelectItem>
-                      <SelectItem value="friday">Friday</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              <Separator />
 
-          {/* Quiet Hours */}
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-foreground">Quiet Hours</CardTitle>
-              <CardDescription>Pause notifications during specific hours</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-foreground">Enable Quiet Hours</p>
-                  <p className="text-sm text-muted-foreground">No notifications during these hours</p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-foreground">Weekly Digest</p>
+                    <p className="text-sm text-muted-foreground">Receive a weekly summary</p>
+                  </div>
+                  <Switch
+                    checked={notifications.weeklyDigest}
+                    onCheckedChange={(checked) => setNotifications({ ...notifications, weeklyDigest: checked })}
+                    disabled={!notifications.emailEnabled}
+                  />
                 </div>
-                <Switch
-                  checked={notifications.quietHoursEnabled}
-                  onCheckedChange={(v) => setNotifications({ ...notifications, quietHoursEnabled: v })}
-                />
+                {notifications.weeklyDigest && (
+                  <div className="ml-4 flex items-center gap-2">
+                    <Label className="text-sm text-muted-foreground">Send digest on</Label>
+                    <Select
+                      value={notifications.digestDay}
+                      onValueChange={(value) => setNotifications({ ...notifications, digestDay: value })}
+                      disabled={!notifications.emailEnabled}
+                    >
+                      <SelectTrigger className="w-32 bg-background border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="monday">Monday</SelectItem>
+                        <SelectItem value="tuesday">Tuesday</SelectItem>
+                        <SelectItem value="wednesday">Wednesday</SelectItem>
+                        <SelectItem value="thursday">Thursday</SelectItem>
+                        <SelectItem value="friday">Friday</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
-              {notifications.quietHoursEnabled && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Start Time</Label>
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-foreground">Quiet Hours</p>
+                    <p className="text-sm text-muted-foreground">Pause notifications during certain hours</p>
+                  </div>
+                  <Switch
+                    checked={notifications.quietHoursEnabled}
+                    onCheckedChange={(checked) => setNotifications({ ...notifications, quietHoursEnabled: checked })}
+                    disabled={!notifications.emailEnabled}
+                  />
+                </div>
+                {notifications.quietHoursEnabled && (
+                  <div className="ml-4 flex items-center gap-2">
+                    <Label className="text-sm text-muted-foreground">From</Label>
                     <Input
                       type="time"
                       value={notifications.quietStart}
                       onChange={(e) => setNotifications({ ...notifications, quietStart: e.target.value })}
-                      className="bg-background border-border"
+                      className="w-28 bg-background border-border"
+                      disabled={!notifications.emailEnabled}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End Time</Label>
+                    <Label className="text-sm text-muted-foreground">to</Label>
                     <Input
                       type="time"
                       value={notifications.quietEnd}
                       onChange={(e) => setNotifications({ ...notifications, quietEnd: e.target.value })}
-                      className="bg-background border-border"
+                      className="w-28 bg-background border-border"
+                      disabled={!notifications.emailEnabled}
                     />
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+
+              <Button onClick={handleSaveNotifications} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Notification Settings"
+                )}
+              </Button>
             </CardContent>
           </Card>
-
-          <div className="flex justify-end">
-            <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
         </div>
       )}
 
       {/* Billing Tab */}
       {activeTab === "billing" && (
         <div className="space-y-6">
-          {/* Current Plan */}
-          <Card className="border-blue-500/30 bg-gradient-to-br from-blue-600/10 to-card">
+          <Card className="border-border bg-card">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-foreground flex items-center gap-2">
-                    {planData.name} Plan
-                    <Badge className="bg-blue-500/20 text-blue-400">Current</Badge>
-                  </CardTitle>
-                  <CardDescription>
-                    ${planData.price}/month · Next billing: {planData.nextBilling}
-                  </CardDescription>
+                  <CardTitle className="text-foreground">Current Plan</CardTitle>
+                  <CardDescription>Manage your subscription</CardDescription>
                 </div>
-                <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowUpgradeDialog(true)}>
-                  <Zap className="h-4 w-4 mr-2" />
-                  Upgrade
-                </Button>
+                <Badge className="bg-blue-600 text-white">{planData.name}</Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Brands</span>
-                    <span className="text-foreground">
-                      {planData.usage.brands.used}/{planData.usage.brands.limit}
-                    </span>
-                  </div>
-                  <Progress
-                    value={(planData.usage.brands.used / planData.usage.brands.limit) * 100}
-                    className="h-2 bg-slate-800"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Competitors</span>
-                    <span className="text-foreground">
-                      {planData.usage.competitors.used}/{planData.usage.competitors.limit}
-                    </span>
-                  </div>
-                  <Progress
-                    value={(planData.usage.competitors.used / planData.usage.competitors.limit) * 100}
-                    className="h-2 bg-slate-800"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
+            <CardContent className="space-y-6">
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-bold text-foreground">${planData.price}</span>
+                <span className="text-muted-foreground">/{planData.billingCycle}</span>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
                     <span className="text-muted-foreground">Analyses</span>
                     <span className="text-foreground">
-                      {planData.usage.analyses.used}/{planData.usage.analyses.limit}
+                      {usage.analyses} / {planData.limits.analyses}
                     </span>
                   </div>
-                  <Progress
-                    value={(planData.usage.analyses.used / planData.usage.analyses.limit) * 100}
-                    className="h-2 bg-slate-800"
-                  />
+                  <Progress value={(usage.analyses / planData.limits.analyses) * 100} className="h-2" />
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-muted-foreground">Reports Generated</span>
+                    <span className="text-foreground">{usage.reports}</span>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Payment Method */}
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-foreground">Payment Method</CardTitle>
-              <CardDescription>Manage your payment information</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between p-4 rounded-lg bg-slate-800/50">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-16 rounded bg-gradient-to-r from-blue-600 to-blue-400 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">VISA</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">•••• •••• •••• 4242</p>
-                    <p className="text-sm text-muted-foreground">Expires 12/26</p>
-                  </div>
-                </div>
-                <Button variant="outline" className="border-border bg-transparent">
-                  Update
+              <div className="flex gap-3">
+                <Button onClick={() => setShowUpgradeDialog(true)} className="bg-blue-600 hover:bg-blue-700">
+                  <Zap className="mr-2 h-4 w-4" />
+                  Upgrade Plan
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCancelDialog(true)}
+                  className="border-border text-muted-foreground hover:text-foreground"
+                >
+                  Cancel Plan
                 </Button>
               </div>
+
+              <p className="text-sm text-muted-foreground">Next billing date: {planData.nextBilling}</p>
             </CardContent>
           </Card>
 
-          {/* Billing History */}
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-foreground">Billing History</CardTitle>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Billing History
+              </CardTitle>
               <CardDescription>View and download past invoices</CardDescription>
             </CardHeader>
             <CardContent>
@@ -707,62 +857,27 @@ export default function SettingsClient() {
                       <TableCell className="text-muted-foreground">{invoice.date}</TableCell>
                       <TableCell className="text-foreground">${invoice.amount}</TableCell>
                       <TableCell>
-                        <Badge className="bg-green-500/20 text-green-400">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Paid
+                        <Badge
+                          variant="secondary"
+                          className={
+                            invoice.status === "paid"
+                              ? "bg-green-900/30 text-green-400"
+                              : "bg-yellow-900/30 text-yellow-400"
+                          }
+                        >
+                          <CheckCircle className="mr-1 h-3 w-3" />
+                          {invoice.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">
-                          <FileText className="h-4 w-4 mr-2" />
-                          PDF
+                        <Button variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300">
+                          <Download className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-
-          {/* Billing Contact */}
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-foreground">Billing Contact</CardTitle>
-              <CardDescription>Where invoices and billing notifications are sent</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Billing Email</Label>
-                  <Input defaultValue="billing@company.com" className="bg-background border-border" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Company Name</Label>
-                  <Input defaultValue="Nike Inc." className="bg-background border-border" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Cancel Subscription */}
-          <Card className="border-red-500/30 bg-card">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-foreground">Cancel Subscription</p>
-                  <p className="text-sm text-muted-foreground">
-                    Your subscription will remain active until {planData.nextBilling}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  className="border-red-500/50 text-red-400 hover:bg-red-500/10 bg-transparent"
-                  onClick={() => setShowCancelDialog(true)}
-                >
-                  Cancel Plan
-                </Button>
-              </div>
             </CardContent>
           </Card>
         </div>
@@ -772,110 +887,60 @@ export default function SettingsClient() {
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="text-foreground flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-400" />
-              Delete Account
-            </DialogTitle>
+            <DialogTitle className="text-red-500">Delete Account</DialogTitle>
             <DialogDescription>
-              This action cannot be undone. All your data, reports, and settings will be permanently deleted.
+              This action cannot be undone. All your data will be permanently deleted.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">To confirm, type &quot;DELETE&quot; below:</p>
-            <Input placeholder="Type DELETE to confirm" className="bg-background border-border" />
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Type <span className="font-mono text-foreground">DELETE</span> to confirm:
+            </p>
+            <Input className="bg-background border-border" placeholder="Type DELETE" />
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              className="border-border bg-transparent"
-              onClick={() => setShowDeleteDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} className="border-border">
               Cancel
             </Button>
-            <Button variant="destructive">Delete Account</Button>
+            <Button variant="destructive" className="bg-red-600 hover:bg-red-700">
+              Delete Account
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Subscription Dialog */}
+      {/* Cancel Plan Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">Cancel Subscription</DialogTitle>
             <DialogDescription>
-              We&apos;re sorry to see you go. Your subscription will remain active until the end of your current billing
-              period.
+              Are you sure you want to cancel your subscription? You&apos;ll lose access to premium features.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-foreground">Before you go, would you like to:</p>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>• Downgrade to a lower tier instead?</li>
-              <li>• Pause your subscription temporarily?</li>
-              <li>• Speak with our support team?</li>
-            </ul>
-          </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              className="border-border bg-transparent"
-              onClick={() => setShowCancelDialog(false)}
-            >
-              Keep Subscription
+            <Button variant="outline" onClick={() => setShowCancelDialog(false)} className="border-border">
+              Keep Plan
             </Button>
-            <Button variant="destructive">Cancel Anyway</Button>
+            <Button variant="destructive" className="bg-red-600 hover:bg-red-700">
+              Cancel Plan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Upgrade Dialog */}
       <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
-        <DialogContent className="bg-card border-border max-w-2xl">
+        <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground">Upgrade Your Plan</DialogTitle>
-            <DialogDescription>Get more brands, competitors, and analyses</DialogDescription>
+            <DialogDescription>Get access to more features and higher limits.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Card className="border-border bg-slate-800/50">
-              <CardHeader>
-                <CardTitle className="text-lg text-foreground">Business</CardTitle>
-                <CardDescription>
-                  <span className="text-2xl font-bold text-foreground">$149</span>/month
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>✓ 10 Brands</p>
-                <p>✓ 50 Competitors</p>
-                <p>✓ Unlimited Analyses</p>
-                <p>✓ Daily Analysis Frequency</p>
-                <p>✓ Priority Support</p>
-              </CardContent>
-            </Card>
-            <Card className="border-blue-500/50 bg-blue-500/10">
-              <CardHeader>
-                <CardTitle className="text-lg text-foreground flex items-center gap-2">
-                  Enterprise
-                  <Badge className="bg-blue-500/20 text-blue-400">Popular</Badge>
-                </CardTitle>
-                <CardDescription>
-                  <span className="text-2xl font-bold text-foreground">Custom</span>
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>✓ Unlimited Brands</p>
-                <p>✓ Unlimited Competitors</p>
-                <p>✓ Unlimited Analyses</p>
-                <p>✓ Real-time Monitoring</p>
-                <p>✓ Dedicated Account Manager</p>
-              </CardContent>
-            </Card>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">Contact our sales team to discuss enterprise options.</p>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              className="border-border bg-transparent"
-              onClick={() => setShowUpgradeDialog(false)}
-            >
+            <Button variant="outline" onClick={() => setShowUpgradeDialog(false)} className="border-border">
               Cancel
             </Button>
             <Button className="bg-blue-600 hover:bg-blue-700">Contact Sales</Button>
