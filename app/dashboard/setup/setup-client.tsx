@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
 
 const STORAGE_KEY = "ai-vibes-setup-wizard"
 
@@ -84,11 +85,13 @@ const competitorSuggestions: Record<string, string[]> = {
 
 export default function SetupClient() {
   const router = useRouter()
+  const { toast } = useToast()
   const [currentStep, setCurrentStep] = useState(1)
   const [data, setData] = useState<WizardData>(defaultData)
   const [newCompetitor, setNewCompetitor] = useState("")
   const [isComplete, setIsComplete] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   // Load saved data on mount
   useEffect(() => {
@@ -151,11 +154,47 @@ export default function SetupClient() {
     }
   }
 
-  const handleComplete = () => {
-    localStorage.removeItem(STORAGE_KEY)
-    setIsComplete(true)
-    setShowConfetti(true)
-    setTimeout(() => setShowConfetti(false), 3000)
+  const handleComplete = async () => {
+    setIsSaving(true)
+
+    try {
+      const response = await fetch("/api/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brand: data.brand,
+          competitors: data.competitors,
+          industry: data.industry === "other" ? data.customIndustry : data.industry,
+          alerts: data.alerts,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to save configuration")
+      }
+
+      // Success
+      localStorage.removeItem(STORAGE_KEY)
+      setIsComplete(true)
+      setShowConfetti(true)
+      setTimeout(() => setShowConfetti(false), 3000)
+
+      toast({
+        title: "Setup Complete!",
+        description: `Now tracking ${data.brand} and ${data.competitors.length} competitors.`,
+      })
+    } catch (error) {
+      console.error("Setup error:", error)
+      toast({
+        title: "Setup Failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const addCompetitor = (comp: string) => {
@@ -525,16 +564,16 @@ export default function SetupClient() {
           variant="outline"
           className="border-border bg-transparent"
           onClick={handleBack}
-          disabled={currentStep === 1}
+          disabled={currentStep === 1 || isSaving}
         >
           <ChevronLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleNext} disabled={!canProceed()}>
+        <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleNext} disabled={!canProceed() || isSaving}>
           {currentStep === 4 ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin hidden" />
-              Complete Setup
+              {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {isSaving ? "Saving..." : "Complete Setup"}
             </>
           ) : (
             <>
