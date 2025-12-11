@@ -121,14 +121,20 @@ export default function DashboardLayoutClient({
       try {
         const supabase = createBrowserClient()
 
+        console.log("[v0] Loading sidebar data...")
+
         // Get current user
         const {
           data: { user },
         } = await supabase.auth.getUser()
 
+        console.log("[v0] User:", user?.id || "not authenticated")
+
         if (user) {
           // Get profile
           const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+
+          console.log("[v0] Profile:", profile?.id || "not found")
 
           if (profile) {
             const plan = profile.plan || "free"
@@ -146,6 +152,8 @@ export default function DashboardLayoutClient({
               .select("id, competitors")
               .eq("user_id", user.id)
               .single()
+
+            console.log("[v0] Config found:", config?.id || "not found")
 
             const competitorsUsed = config?.competitors?.length || 0
             if (config) {
@@ -180,9 +188,10 @@ export default function DashboardLayoutClient({
           setUnreadAlerts(count || 0)
         }
       } catch (error) {
-        console.error("Error loading sidebar data:", error)
+        console.error("[v0] Error loading sidebar data:", error)
       } finally {
         setIsLoading(false)
+        console.log("[v0] Sidebar data loaded, isLoading = false")
       }
     }
 
@@ -194,29 +203,39 @@ export default function DashboardLayoutClient({
   }
 
   const runAnalysis = async () => {
-    console.log("[v0] Run Analysis clicked")
+    console.log("[v0] ====== Run Analysis Button Clicked ======")
+    console.log("[v0] isRunningAnalysis:", isRunningAnalysis)
     console.log("[v0] configId:", configId)
+    console.log("[v0] isLoading:", isLoading)
+
+    // Prevent double-clicks
+    if (isRunningAnalysis) {
+      console.log("[v0] Already running, ignoring click")
+      return
+    }
 
     if (!configId) {
-      console.log("[v0] No configId found, redirecting to setup")
+      console.log("[v0] No configId found, showing toast and redirecting to setup")
       toast({
-        title: "No Configuration",
-        description: "Please complete the setup wizard first.",
+        title: "Setup Required",
+        description: "Please complete the setup wizard first to configure your brand tracking.",
         variant: "destructive",
       })
       router.push("/dashboard/setup")
       return
     }
 
+    console.log("[v0] Setting isRunningAnalysis to true")
     setIsRunningAnalysis(true)
 
     try {
-      console.log("[v0] Starting analysis...")
+      console.log("[v0] Showing 'Analysis Started' toast")
       toast({
         title: "Analysis Started",
         description: "Your brand analysis is running. This may take a few minutes.",
       })
 
+      console.log("[v0] Calling /api/analysis/run with configId:", configId)
       const response = await fetch("/api/analysis/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -224,6 +243,7 @@ export default function DashboardLayoutClient({
       })
 
       console.log("[v0] Response status:", response.status)
+
       const result = await response.json()
       console.log("[v0] Response result:", result)
 
@@ -231,6 +251,7 @@ export default function DashboardLayoutClient({
         throw new Error(result.error || result.message || "Analysis failed")
       }
 
+      console.log("[v0] Analysis completed successfully")
       toast({
         title: "Analysis Complete",
         description: "Your brand report is ready to view.",
@@ -246,6 +267,7 @@ export default function DashboardLayoutClient({
         variant: "destructive",
       })
     } finally {
+      console.log("[v0] Setting isRunningAnalysis to false")
       setIsRunningAnalysis(false)
     }
   }
