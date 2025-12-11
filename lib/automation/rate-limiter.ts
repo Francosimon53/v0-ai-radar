@@ -37,11 +37,10 @@ export async function checkRateLimit(
   const limit = PLAN_LIMITS[plan]
 
   const { data, error } = await supabase
-    .from("usage_records")
-    .select("count")
+    .from("api_usage")
+    .select("analyses_count")
     .eq("user_id", userId)
-    .eq("action", action)
-    .eq("period_start", periodStart)
+    .eq("month", periodStart.substring(0, 7)) // YYYY-MM format
     .single()
 
   if (error && error.code !== "PGRST116") {
@@ -50,7 +49,7 @@ export async function checkRateLimit(
     return { allowed: true, remaining: limit, limit }
   }
 
-  const currentCount = data?.count || 0
+  const currentCount = data?.analyses_count || 0
   const remaining = Math.max(0, limit - currentCount)
   const allowed = currentCount < limit
 
@@ -62,28 +61,26 @@ export async function checkRateLimit(
  */
 export async function recordUsage(userId: string, action: string): Promise<void> {
   const supabase = createServiceClient()
-  const periodStart = getCurrentPeriodStart()
+  const month = new Date().toISOString().substring(0, 7) // YYYY-MM format
 
   // Try to update existing record
   const { data: existing } = await supabase
-    .from("usage_records")
-    .select("id, count")
+    .from("api_usage")
+    .select("id, analyses_count")
     .eq("user_id", userId)
-    .eq("action", action)
-    .eq("period_start", periodStart)
+    .eq("month", month)
     .single()
 
   if (existing) {
     await supabase
-      .from("usage_records")
-      .update({ count: existing.count + 1 })
+      .from("api_usage")
+      .update({ analyses_count: existing.analyses_count + 1 })
       .eq("id", existing.id)
   } else {
-    await supabase.from("usage_records").insert({
+    await supabase.from("api_usage").insert({
       user_id: userId,
-      action,
-      count: 1,
-      period_start: periodStart,
+      month,
+      analyses_count: 1,
     })
   }
 }

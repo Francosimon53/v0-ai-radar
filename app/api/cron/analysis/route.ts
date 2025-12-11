@@ -177,11 +177,7 @@ async function checkAlertConditions(
   previous: { brand_strength_index: number; share_of_voice: number },
 ) {
   // Fetch user's alert settings
-  const { data: settings } = await supabase
-    .from("notification_settings")
-    .select("*")
-    .eq("user_id", config.user_id)
-    .single()
+  const { data: settings } = await supabase.from("alert_settings").select("*").eq("user_id", config.user_id).single()
 
   const scoreThreshold = settings?.score_drop_threshold || 5
   const competitorThreshold = settings?.competitor_rise_threshold || 5
@@ -240,11 +236,7 @@ async function sendNotificationIfEnabled(
   analysis: Awaited<ReturnType<typeof runFullAnalysis>>,
 ) {
   // Fetch user's notification preferences
-  const { data: settings } = await supabase
-    .from("notification_settings")
-    .select("*")
-    .eq("user_id", config.user_id)
-    .single()
+  const { data: settings } = await supabase.from("alert_settings").select("*").eq("user_id", config.user_id).single()
 
   if (!settings?.email_enabled) return
 

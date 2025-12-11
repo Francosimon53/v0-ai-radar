@@ -20,7 +20,7 @@ interface UserData {
 async function getUserData(userId: string): Promise<UserData | null> {
   const supabase = createServiceRoleClient()
 
-  const { data: user, error } = await supabase.from("users").select("id, email, name").eq("id", userId).single()
+  const { data: user, error } = await supabase.from("profiles").select("id, email, full_name").eq("id", userId).single()
 
   if (error || !user) {
     console.error("[Email] Failed to fetch user:", error)
@@ -30,14 +30,16 @@ async function getUserData(userId: string): Promise<UserData | null> {
   // Get user's primary brand
   const { data: config } = await supabase
     .from("tracking_configs")
-    .select("brand_name")
+    .select("brand")
     .eq("user_id", userId)
     .limit(1)
     .single()
 
   return {
-    ...user,
-    brand_name: config?.brand_name,
+    id: user.id,
+    email: user.email,
+    name: user.full_name || "",
+    brand_name: config?.brand,
   }
 }
 

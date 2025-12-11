@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch user's alert settings
-    const { data: settings } = await supabase.from("notification_settings").select("*").eq("user_id", user.id).single()
+    const { data: settings } = await supabase.from("alert_settings").select("*").eq("user_id", user.id).single()
 
     const scoreDropThreshold = settings?.score_drop_threshold || 5
     const competitorRiseThreshold = settings?.competitor_rise_threshold || 5
