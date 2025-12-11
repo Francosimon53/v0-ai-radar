@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/hooks/use-toast"
 import {
   HelpCircle,
   Users,
@@ -14,6 +15,7 @@ import {
   ChevronRight,
   AlertTriangle,
   Award,
+  Loader2,
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts"
 
@@ -128,8 +130,10 @@ const recommendedActions = [
 const brandScoreSparkline = [{ value: 78 }, { value: 80 }, { value: 79 }, { value: 82 }, { value: 81 }, { value: 84 }]
 
 export default function DashboardClient() {
+  const { toast } = useToast()
   const [selectedBrands, setSelectedBrands] = useState<string[]>(["nike", "adidas"])
   const [timeRange, setTimeRange] = useState("30d")
+  const [isRunningAnalysis, setIsRunningAnalysis] = useState(false)
 
   const toggleBrand = (brand: string) => {
     setSelectedBrands((prev) => (prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand]))
@@ -140,6 +144,33 @@ export default function DashboardClient() {
     adidas: "#22c55e",
     underarmour: "#f59e0b",
     puma: "#ef4444",
+  }
+
+  const runAnalysis = async () => {
+    setIsRunningAnalysis(true)
+
+    try {
+      toast({
+        title: "Analysis Started",
+        description: "Your brand analysis is running. This may take a few minutes.",
+      })
+
+      // Simulate analysis for demo
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      toast({
+        title: "Analysis Complete",
+        description: "Your brand report is ready to view.",
+      })
+    } catch (error) {
+      toast({
+        title: "Analysis Failed",
+        description: "An error occurred while running the analysis. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsRunningAnalysis(false)
+    }
   }
 
   return (
@@ -418,9 +449,18 @@ export default function DashboardClient() {
               <CardTitle className="text-foreground">Recommended Actions</CardTitle>
               <CardDescription>AI-powered suggestions</CardDescription>
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700" size="sm">
-              <Play className="h-4 w-4 mr-2" />
-              Run Analysis
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              size="sm"
+              onClick={runAnalysis}
+              disabled={isRunningAnalysis}
+            >
+              {isRunningAnalysis ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 mr-2" />
+              )}
+              {isRunningAnalysis ? "Running..." : "Run Analysis"}
             </Button>
           </CardHeader>
           <CardContent className="space-y-3">

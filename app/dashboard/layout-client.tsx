@@ -20,6 +20,7 @@ import {
   LogOut,
   Radar,
   Search,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Progress } from "@/components/ui/progress"
+import { useToast } from "@/hooks/use-toast"
 
 // Placeholder data
 const userData = {
@@ -86,14 +88,45 @@ export default function DashboardLayoutClient({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const { toast } = useToast()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(true)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isRunningAnalysis, setIsRunningAnalysis] = useState(false)
 
   const currentPage = pageInfo[pathname] || pageInfo["/dashboard"]
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode)
     document.documentElement.classList.toggle("dark")
+  }
+
+  const runAnalysis = async () => {
+    setIsRunningAnalysis(true)
+
+    try {
+      // For demo purposes, we'll show a toast since we don't have a configId yet
+      // In production, this would fetch the user's active config and run analysis
+      toast({
+        title: "Analysis Started",
+        description: "Your brand analysis is running. This may take a few minutes.",
+      })
+
+      // Simulate analysis for demo
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      toast({
+        title: "Analysis Complete",
+        description: "Your brand report is ready to view.",
+      })
+    } catch (error) {
+      toast({
+        title: "Analysis Failed",
+        description: "An error occurred while running the analysis. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsRunningAnalysis(false)
+    }
   }
 
   const SidebarContent = () => (
@@ -114,7 +147,7 @@ export default function DashboardLayoutClient({
             <Link
               key={item.name}
               href={item.href}
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive ? "bg-primary text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"
               }`}
@@ -204,7 +237,7 @@ export default function DashboardLayoutClient({
       </aside>
 
       {/* Mobile Sidebar */}
-      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-64 bg-slate-900 p-0">
           <SidebarContent />
         </SheetContent>
@@ -216,7 +249,7 @@ export default function DashboardLayoutClient({
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:px-6">
           {/* Left: Mobile menu + Page title */}
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileMenuOpen(true)}>
+            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
               <Menu className="h-5 w-5" />
             </Button>
             <div>
@@ -231,12 +264,12 @@ export default function DashboardLayoutClient({
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input type="search" placeholder="Search..." className="w-48 pl-9 lg:w-64" />
             </div>
-            <Button className="hidden gap-2 sm:flex">
-              <Play className="h-4 w-4" />
-              Run Analysis
+            <Button className="hidden gap-2 sm:flex" onClick={runAnalysis} disabled={isRunningAnalysis}>
+              {isRunningAnalysis ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              {isRunningAnalysis ? "Running..." : "Run Analysis"}
             </Button>
-            <Button size="icon" className="sm:hidden">
-              <Play className="h-4 w-4" />
+            <Button size="icon" className="sm:hidden" onClick={runAnalysis} disabled={isRunningAnalysis}>
+              {isRunningAnalysis ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
             </Button>
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-5 w-5" />
