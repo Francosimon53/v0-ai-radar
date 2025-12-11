@@ -18,8 +18,9 @@ import {
   User,
   CreditCard,
   LogOut,
-  Radar,
   Loader2,
+  Sparkles,
+  Activity,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -31,7 +32,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
-import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import { createBrowserClient } from "@/lib/supabase/client"
 
@@ -59,27 +59,27 @@ const planLimits: Record<string, { competitors: number; analyses: number }> = {
 const pageInfo: Record<string, { title: string; description: string }> = {
   "/dashboard": {
     title: "Dashboard",
-    description: "Overview of your brand perception across AI models",
+    description: "Brand intelligence overview",
   },
   "/dashboard/competitors": {
     title: "Competitors",
-    description: "Track and compare competitor brand perception",
+    description: "Competitive analysis",
   },
   "/dashboard/reports": {
     title: "Reports",
-    description: "View and download your AI perception reports",
+    description: "Intelligence reports",
   },
   "/dashboard/alerts": {
     title: "Alerts",
-    description: "Notifications about significant perception changes",
+    description: "Real-time notifications",
   },
   "/dashboard/settings": {
     title: "Settings",
-    description: "Manage your account and preferences",
+    description: "Account preferences",
   },
   "/dashboard/setup": {
     title: "Setup",
-    description: "Configure your brand tracking",
+    description: "Configure tracking",
   },
 }
 
@@ -98,7 +98,7 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
     avatar: null,
   })
   const [planData, setPlanData] = useState<PlanData>({
-    name: "Free Plan",
+    name: "Free",
     competitorsUsed: 0,
     competitorsLimit: 5,
     analysesUsed: 0,
@@ -111,6 +111,7 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
 
   useEffect(() => {
     setMounted(true)
+    setTheme("dark")
     loadSidebarData()
   }, [])
 
@@ -145,7 +146,6 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
             setConfigId(config.id)
           }
 
-          // Get reports count this month
           const startOfMonth = new Date()
           startOfMonth.setDate(1)
           startOfMonth.setHours(0, 0, 0, 0)
@@ -157,7 +157,7 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
             .gte("created_at", startOfMonth.toISOString())
 
           setPlanData({
-            name: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`,
+            name: plan.charAt(0).toUpperCase() + plan.slice(1),
             competitorsUsed,
             competitorsLimit: limits.competitors,
             analysesUsed: reportsCount || 0,
@@ -200,7 +200,7 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
     try {
       toast({
         title: "Analysis Started",
-        description: "Analyzing your brand across AI models...",
+        description: "Running AI analysis (30-60 seconds)...",
       })
 
       const response = await fetch("/api/analysis/run", {
@@ -221,6 +221,7 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
       })
 
       router.refresh()
+      window.location.reload()
     } catch (error) {
       toast({
         title: "Analysis Failed",
@@ -247,17 +248,21 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
   ]
 
   const SidebarContent = () => (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-[#0a0a0f]">
       {/* Logo */}
-      <div className="flex items-center gap-3 border-b border-sidebar-border px-6 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-          <Radar className="h-5 w-5 text-primary-foreground" />
+      <div className="flex items-center gap-3 px-5 py-6">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400">
+          <Activity className="h-5 w-5 text-white" />
         </div>
-        <span className="text-lg font-semibold">AI Radar</span>
+        <div>
+          <span className="text-lg font-bold text-white">AI Radar</span>
+          <span className="ml-1.5 rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-medium text-blue-400">PRO</span>
+        </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 px-3 py-2">
+        <div className="mb-2 px-3 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Menu</div>
         {navItems.map((item) => {
           const isActive = pathname === item.href
           return (
@@ -265,18 +270,21 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
               key={item.name}
               href={item.href}
               onClick={() => setSidebarOpen(false)}
-              className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`group relative mb-1 flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                  ? "bg-gradient-to-r from-blue-500/20 to-cyan-500/10 text-white"
+                  : "text-zinc-400 hover:bg-white/5 hover:text-white"
               }`}
             >
+              {isActive && (
+                <div className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-blue-400 to-cyan-400" />
+              )}
               <div className="flex items-center gap-3">
-                <item.icon className="h-5 w-5" />
+                <item.icon className={`h-[18px] w-[18px] ${isActive ? "text-blue-400" : ""}`} />
                 {item.name}
               </div>
               {item.badge && item.badge > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-medium text-destructive-foreground">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-medium text-white">
                   {item.badge}
                 </span>
               )}
@@ -285,69 +293,84 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
         })}
       </nav>
 
-      {/* Plan Status */}
-      <div className="mx-3 mb-4 rounded-lg bg-sidebar-accent p-4">
+      {/* Usage Stats */}
+      <div className="mx-3 mb-3 rounded-xl bg-gradient-to-br from-zinc-800/50 to-zinc-900/50 p-4 border border-zinc-800/50">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-medium">{planData.name}</span>
-          <Link href="/dashboard/settings" className="text-xs text-primary hover:underline">
+          <span className="text-sm font-semibold text-white">{planData.name} Plan</span>
+          <Link
+            href="/dashboard/settings"
+            className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors"
+          >
             Upgrade
           </Link>
         </div>
         <div className="space-y-3">
           <div>
-            <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-              <span>Competitors</span>
-              <span>
-                {planData.competitorsUsed}/{planData.competitorsLimit}
+            <div className="mb-1.5 flex justify-between text-xs">
+              <span className="text-zinc-500">Competitors</span>
+              <span className="font-mono text-zinc-400">
+                {planData.competitorsUsed}
+                <span className="text-zinc-600">/{planData.competitorsLimit}</span>
               </span>
             </div>
-            <Progress value={(planData.competitorsUsed / planData.competitorsLimit) * 100} className="h-1.5" />
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500"
+                style={{ width: `${Math.min((planData.competitorsUsed / planData.competitorsLimit) * 100, 100)}%` }}
+              />
+            </div>
           </div>
           <div>
-            <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-              <span>Analyses</span>
-              <span>
-                {planData.analysesUsed}/{planData.analysesLimit}
+            <div className="mb-1.5 flex justify-between text-xs">
+              <span className="text-zinc-500">Analyses</span>
+              <span className="font-mono text-zinc-400">
+                {planData.analysesUsed}
+                <span className="text-zinc-600">/{planData.analysesLimit}</span>
               </span>
             </div>
-            <Progress value={(planData.analysesUsed / planData.analysesLimit) * 100} className="h-1.5" />
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
+                style={{ width: `${Math.min((planData.analysesUsed / planData.analysesLimit) * 100, 100)}%` }}
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* User Profile */}
-      <div className="border-t border-sidebar-border p-3">
+      <div className="border-t border-zinc-800/50 p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-sidebar-accent">
-              <Avatar className="h-9 w-9">
+            <button className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/5">
+              <Avatar className="h-9 w-9 ring-2 ring-zinc-700">
                 <AvatarImage src={userData.avatar || undefined} />
-                <AvatarFallback className="bg-primary text-primary-foreground">
+                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-cyan-400 text-white text-sm font-semibold">
                   {userData.name.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 truncate">
-                <p className="text-sm font-medium">{userData.name}</p>
-                <p className="truncate text-xs text-muted-foreground">{userData.email}</p>
+                <p className="text-sm font-medium text-white">{userData.name}</p>
+                <p className="truncate text-xs text-zinc-500">{userData.email}</p>
               </div>
-              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              <ChevronUp className="h-4 w-4 text-zinc-500" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem asChild>
+          <DropdownMenuContent align="end" className="w-56 bg-zinc-900 border-zinc-800">
+            <DropdownMenuItem asChild className="text-zinc-300 focus:bg-zinc-800 focus:text-white">
               <Link href="/dashboard/settings">
                 <User className="mr-2 h-4 w-4" />
                 Profile
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
+            <DropdownMenuItem asChild className="text-zinc-300 focus:bg-zinc-800 focus:text-white">
               <Link href="/dashboard/settings">
                 <CreditCard className="mr-2 h-4 w-4" />
                 Billing
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+            <DropdownMenuSeparator className="bg-zinc-800" />
+            <DropdownMenuItem onClick={handleLogout} className="text-red-400 focus:bg-red-500/10 focus:text-red-400">
               <LogOut className="mr-2 h-4 w-4" />
               Log out
             </DropdownMenuItem>
@@ -358,15 +381,15 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
   )
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-[#050507]">
       {/* Desktop Sidebar */}
-      <aside className="hidden w-64 flex-shrink-0 border-r border-sidebar-border bg-sidebar lg:block">
+      <aside className="hidden w-64 flex-shrink-0 border-r border-zinc-800/50 lg:block">
         <SidebarContent />
       </aside>
 
       {/* Mobile Sidebar */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-64 bg-sidebar p-0">
+        <SheetContent side="left" className="w-64 bg-[#0a0a0f] p-0 border-zinc-800">
           <SidebarContent />
         </SheetContent>
       </Sheet>
@@ -374,68 +397,88 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
       {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <header className="flex h-16 items-center justify-between border-b bg-card px-4 lg:px-6">
+        <header className="flex h-16 items-center justify-between border-b border-zinc-800/50 bg-[#0a0a0f]/80 backdrop-blur-xl px-4 lg:px-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden text-zinc-400 hover:text-white hover:bg-zinc-800"
+              onClick={() => setSidebarOpen(true)}
+            >
               <Menu className="h-5 w-5" />
             </Button>
             <div className="hidden sm:block">
-              <h1 className="text-lg font-semibold">{currentPage.title}</h1>
-              <p className="text-sm text-muted-foreground">{currentPage.description}</p>
+              <h1 className="text-lg font-semibold text-white">{currentPage.title}</h1>
+              <p className="text-sm text-zinc-500">{currentPage.description}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button onClick={runAnalysis} disabled={isRunningAnalysis} className="gap-2">
+          <div className="flex items-center gap-2">
+            {/* Run Analysis Button */}
+            <Button
+              onClick={runAnalysis}
+              disabled={isRunningAnalysis}
+              className="gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white border-0 shadow-lg shadow-blue-500/25"
+            >
               {isRunningAnalysis ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="hidden sm:inline">Running...</span>
+                  <span className="hidden sm:inline">Analyzing...</span>
                 </>
               ) : (
                 <>
-                  <Radar className="h-4 w-4" />
+                  <Sparkles className="h-4 w-4" />
                   <span className="hidden sm:inline">Run Analysis</span>
                 </>
               )}
             </Button>
 
-            <Button variant="ghost" size="icon" className="relative" asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative text-zinc-400 hover:text-white hover:bg-zinc-800"
+              asChild
+            >
               <Link href="/dashboard/alerts">
                 <Bell className="h-5 w-5" />
                 {unreadAlerts > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-xs font-medium text-destructive-foreground">
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-medium text-white">
                     {unreadAlerts}
                   </span>
                 )}
               </Link>
             </Button>
 
-            <Button variant="ghost" size="icon" onClick={toggleTheme}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="text-zinc-400 hover:text-white hover:bg-zinc-800"
+            >
               {mounted && theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto p-4 lg:p-6">{children}</main>
+        <main className="flex-1 overflow-auto bg-[#050507] p-4 lg:p-6">{children}</main>
 
         {/* Mobile Nav */}
-        <nav className="flex border-t bg-card lg:hidden">
+        <nav className="flex border-t border-zinc-800/50 bg-[#0a0a0f] lg:hidden">
           {navItems.slice(0, 5).map((item) => {
             const isActive = pathname === item.href
             return (
               <Link
                 key={item.name}
                 href={item.href}
-                className={`relative flex flex-1 flex-col items-center gap-1 py-3 text-xs ${
-                  isActive ? "text-primary" : "text-muted-foreground"
+                className={`relative flex flex-1 flex-col items-center gap-1 py-3 text-xs transition-colors ${
+                  isActive ? "text-blue-400" : "text-zinc-500"
                 }`}
               >
                 <item.icon className="h-5 w-5" />
                 <span>{item.name}</span>
                 {item.badge && item.badge > 0 && (
-                  <span className="absolute right-1/4 top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-xs font-medium text-destructive-foreground">
+                  <span className="absolute right-1/4 top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-medium text-white">
                     {item.badge}
                   </span>
                 )}
