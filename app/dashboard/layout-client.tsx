@@ -194,7 +194,11 @@ export default function DashboardLayoutClient({
   }
 
   const runAnalysis = async () => {
+    console.log("[v0] Run Analysis clicked")
+    console.log("[v0] configId:", configId)
+
     if (!configId) {
+      console.log("[v0] No configId found, redirecting to setup")
       toast({
         title: "No Configuration",
         description: "Please complete the setup wizard first.",
@@ -207,6 +211,7 @@ export default function DashboardLayoutClient({
     setIsRunningAnalysis(true)
 
     try {
+      console.log("[v0] Starting analysis...")
       toast({
         title: "Analysis Started",
         description: "Your brand analysis is running. This may take a few minutes.",
@@ -218,10 +223,12 @@ export default function DashboardLayoutClient({
         body: JSON.stringify({ configId }),
       })
 
+      console.log("[v0] Response status:", response.status)
       const result = await response.json()
+      console.log("[v0] Response result:", result)
 
       if (!response.ok) {
-        throw new Error(result.error || "Analysis failed")
+        throw new Error(result.error || result.message || "Analysis failed")
       }
 
       toast({
@@ -232,6 +239,7 @@ export default function DashboardLayoutClient({
       // Refresh the page to show new data
       router.refresh()
     } catch (error) {
+      console.error("[v0] Analysis error:", error)
       toast({
         title: "Analysis Failed",
         description: error instanceof Error ? error.message : "An error occurred. Please try again.",
