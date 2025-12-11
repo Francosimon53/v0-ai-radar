@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -9,19 +9,24 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
 import {
   Bell,
   Settings,
   TrendingDown,
   TrendingUp,
   Trophy,
-  AlertCircle,
   ChevronRight,
   ArrowDown,
   ArrowUp,
   LayoutDashboard,
+  Loader2,
+  Trash2,
+  CheckCheck,
 } from "lucide-react"
-import AlertChart from "./alert-chart"
+import dynamic from "next/dynamic"
+
+const AlertChart = dynamic(() => import("./alert-chart"), { ssr: false })
 
 type AlertType = "score_drop" | "competitor_rise" | "rank_change" | "milestone" | "system"
 type AlertSeverity = "high" | "medium" | "low"
@@ -31,8 +36,7 @@ interface Alert {
   type: AlertType
   title: string
   message: string
-  time: string
-  timestamp: Date
+  created_at: string
   severity: AlertSeverity
   read: boolean
   data?: {
@@ -43,75 +47,6 @@ interface Alert {
     metric?: string
   }
 }
-
-// Sample alert data
-const sampleAlerts: Alert[] = [
-  {
-    id: "1",
-    type: "score_drop",
-    title: "Innovation score dropped 6 points",
-    message:
-      "Your innovation perception fell from 88 to 82. This correlates with competitor Adidas launching their new campaign.",
-    time: "2 hours ago",
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    severity: "high",
-    read: false,
-    data: { from: 88, to: 82, change: -6, metric: "Innovation" },
-  },
-  {
-    id: "2",
-    type: "competitor_rise",
-    title: "Adidas gained 5 points in sustainability",
-    message: "Adidas sustainability score rose from 73 to 78, closing the gap with your brand.",
-    time: "1 day ago",
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-    severity: "medium",
-    read: false,
-    data: { from: 73, to: 78, change: 5, brand: "Adidas", metric: "Sustainability" },
-  },
-  {
-    id: "3",
-    type: "milestone",
-    title: "You reached #1 in customer trust!",
-    message: "Congratulations! Your brand is now ranked #1 for customer trust perception among your competitors.",
-    time: "3 days ago",
-    timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    severity: "low",
-    read: true,
-  },
-  {
-    id: "4",
-    type: "system",
-    title: "Weekly analysis complete",
-    message: "Your weekly brand intelligence report is ready to view.",
-    time: "5 days ago",
-    timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    severity: "low",
-    read: true,
-  },
-  {
-    id: "5",
-    type: "rank_change",
-    title: "Your ranking improved in value perception",
-    message: "Nike moved from #3 to #2 in value perception category, surpassing New Balance.",
-    time: "1 week ago",
-    timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    severity: "medium",
-    read: true,
-    data: { from: 3, to: 2, metric: "Value Perception" },
-  },
-  {
-    id: "6",
-    type: "score_drop",
-    title: "Affordability perception declined",
-    message: "Your affordability score decreased by 4 points following the price increase announcement.",
-    time: "2 weeks ago",
-    timestamp: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-    severity: "medium",
-    read: true,
-    data: { from: 65, to: 61, change: -4, metric: "Affordability" },
-  },
-]
 
 const alertTypeConfig: Record<
   AlertType,
@@ -154,347 +89,423 @@ const alertTypeConfig: Record<
   },
 }
 
-const filterTabs: { key: AlertType | "all"; label: string }[] = [
-  { key: "all", label: "All Alerts" },
-  { key: "score_drop", label: "Score Drops" },
-  { key: "competitor_rise", label: "Competitor" },
-  { key: "rank_change", label: "Rank Changes" },
-  { key: "milestone", label: "Milestones" },
-  { key: "system", label: "System" },
-]
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 60) return `${diffMins} minutes ago`
+  if (diffHours < 24) return `${diffHours} hours ago`
+  if (diffDays < 7) return `${diffDays} days ago`
+  return date.toLocaleDateString()
+}
 
 export default function AlertsClient() {
-  const [alerts, setAlerts] = useState<Alert[]>(sampleAlerts)
-  const [activeFilter, setActiveFilter] = useState<AlertType | "all">("all")
+  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [loading, setLoading] = useState(true)
+  const [unreadCount, setUnreadCount] = useState(0)
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null)
-  const [isDetailOpen, setIsDetailOpen] = useState(false)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [showDetail, setShowDetail] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [activeFilter, setActiveFilter] = useState<AlertType | "all">("all")
+  const { toast } = useToast()
 
-  // Settings state
-  const [emailEnabled, setEmailEnabled] = useState(true)
-  const [scoreDropEnabled, setScoreDropEnabled] = useState(true)
-  const [scoreDropThreshold, setScoreDropThreshold] = useState("5")
-  const [competitorEnabled, setCompetitorEnabled] = useState(true)
-  const [competitorThreshold, setCompetitorThreshold] = useState("5")
-  const [weeklyDigest, setWeeklyDigest] = useState(true)
-  const [quietHoursEnabled, setQuietHoursEnabled] = useState(false)
+  // Alert settings state
+  const [alertSettings, setAlertSettings] = useState({
+    emailEnabled: true,
+    scoreDropThreshold: 5,
+    competitorAlerts: true,
+    weeklyDigest: true,
+    quietHoursEnabled: false,
+    quietHoursStart: "22:00",
+    quietHoursEnd: "08:00",
+  })
 
-  const filteredAlerts = activeFilter === "all" ? alerts : alerts.filter((a) => a.type === activeFilter)
+  useEffect(() => {
+    fetchAlerts()
+    fetchAlertSettings()
+  }, [activeFilter])
 
-  const unreadCount = alerts.filter((a) => !a.read).length
-  const getCountByType = (type: AlertType) => alerts.filter((a) => a.type === type).length
+  const fetchAlerts = async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams()
+      if (activeFilter !== "all") params.set("type", activeFilter)
+
+      const response = await fetch(`/api/alerts?${params}`)
+      const data = await response.json()
+
+      if (data.alerts) {
+        setAlerts(data.alerts)
+        setUnreadCount(data.unreadCount || 0)
+      }
+    } catch (error) {
+      console.error("Error fetching alerts:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load alerts",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchAlertSettings = async () => {
+    try {
+      const response = await fetch("/api/alert-settings")
+      const data = await response.json()
+      if (data.settings) {
+        setAlertSettings(data.settings)
+      }
+    } catch (error) {
+      console.error("Error fetching alert settings:", error)
+    }
+  }
+
+  const handleMarkAsRead = async (alertId: string) => {
+    try {
+      await fetch("/api/alerts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alertId, read: true }),
+      })
+
+      setAlerts(alerts.map((a) => (a.id === alertId ? { ...a, read: true } : a)))
+      setUnreadCount(Math.max(0, unreadCount - 1))
+    } catch (error) {
+      console.error("Error marking alert as read:", error)
+    }
+  }
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await fetch("/api/alerts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alertId: "all", read: true }),
+      })
+
+      setAlerts(alerts.map((a) => ({ ...a, read: true })))
+      setUnreadCount(0)
+
+      toast({
+        title: "All alerts marked as read",
+        description: `${alerts.filter((a) => !a.read).length} alerts updated`,
+      })
+    } catch (error) {
+      console.error("Error marking all as read:", error)
+    }
+  }
+
+  const handleDeleteAlert = async (alertId: string) => {
+    try {
+      await fetch(`/api/alerts?id=${alertId}`, { method: "DELETE" })
+
+      const deletedAlert = alerts.find((a) => a.id === alertId)
+      setAlerts(alerts.filter((a) => a.id !== alertId))
+      if (deletedAlert && !deletedAlert.read) {
+        setUnreadCount(Math.max(0, unreadCount - 1))
+      }
+
+      toast({
+        title: "Alert deleted",
+        description: "The alert has been removed",
+      })
+    } catch (error) {
+      console.error("Error deleting alert:", error)
+    }
+  }
 
   const handleAlertClick = (alert: Alert) => {
     setSelectedAlert(alert)
-    setIsDetailOpen(true)
-    // Mark as read
-    setAlerts((prev) => prev.map((a) => (a.id === alert.id ? { ...a, read: true } : a)))
+    setShowDetail(true)
+    if (!alert.read) {
+      handleMarkAsRead(alert.id)
+    }
   }
 
-  const markAllRead = () => {
-    setAlerts((prev) => prev.map((a) => ({ ...a, read: true })))
+  const handleSaveSettings = async () => {
+    try {
+      await fetch("/api/alert-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(alertSettings),
+      })
+
+      toast({
+        title: "Settings saved",
+        description: "Your alert preferences have been updated",
+      })
+      setShowSettings(false)
+    } catch (error) {
+      console.error("Error saving settings:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save settings",
+        variant: "destructive",
+      })
+    }
   }
 
-  // Generate chart data for the selected alert
-  const getChartData = (alert: Alert) => {
-    if (!alert.data) return []
-    const baseValue = alert.data.to || 75
-    return Array.from({ length: 7 }, (_, i) => ({
-      date: `Day ${i + 1}`,
-      value: baseValue + Math.floor(Math.random() * 10 - 5) + (i < 5 ? (alert.data?.change || 0) * (1 - i / 5) : 0),
-    }))
+  const filterTabs = [
+    { key: "all" as const, label: "All", count: alerts.length },
+    { key: "score_drop" as const, label: "Score Drops", count: alerts.filter((a) => a.type === "score_drop").length },
+    {
+      key: "competitor_rise" as const,
+      label: "Competitors",
+      count: alerts.filter((a) => a.type === "competitor_rise").length,
+    },
+    { key: "milestone" as const, label: "Milestones", count: alerts.filter((a) => a.type === "milestone").length },
+  ]
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Alerts</h1>
-          <p className="text-muted-foreground">Stay informed about changes in your brand perception</p>
+          <h1 className="text-2xl font-bold text-white">Alerts</h1>
+          <p className="text-slate-400 mt-1">Stay informed about changes in your brand perception</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-1.5">
-            <Bell className="h-4 w-4 text-blue-500" />
-            <span className="text-sm font-medium">{unreadCount} unread</span>
-          </div>
-          <Button variant="outline" size="sm" onClick={markAllRead} disabled={unreadCount === 0}>
-            Mark all read
-          </Button>
-          <Button variant="outline" size="icon" onClick={() => setIsSettingsOpen(true)}>
-            <Settings className="h-4 w-4" />
+          {unreadCount > 0 && (
+            <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-sm rounded-full">{unreadCount} unread</span>
+          )}
+          {alerts.some((a) => !a.read) && (
+            <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>
+              <CheckCheck className="h-4 w-4 mr-2" />
+              Mark all read
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setShowSettings(true)}>
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
           </Button>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-2 border-b pb-4">
-        {filterTabs.map((tab) => {
-          const count = tab.key === "all" ? alerts.length : getCountByType(tab.key as AlertType)
-          const isActive = activeFilter === tab.key
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveFilter(tab.key)}
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        {filterTabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveFilter(tab.key)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+              activeFilter === tab.key ? "bg-blue-500 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+            }`}
+          >
+            {tab.label}
+            <span
+              className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
+                activeFilter === tab.key ? "bg-blue-600" : "bg-slate-700"
               }`}
             >
-              {tab.label}
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  isActive ? "bg-primary-foreground/20 text-primary-foreground" : "bg-background"
-                }`}
-              >
-                {count}
-              </span>
-            </button>
-          )
-        })}
+              {tab.count}
+            </span>
+          </button>
+        ))}
       </div>
 
-      {/* Alerts List */}
-      <div className="space-y-3">
-        {filteredAlerts.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <Bell className="mb-4 h-12 w-12 text-muted-foreground/50" />
-              <h3 className="mb-2 font-medium">No alerts</h3>
-              <p className="text-sm text-muted-foreground">
-                {activeFilter === "all"
-                  ? "You're all caught up! No alerts at this time."
-                  : `No ${alertTypeConfig[activeFilter as AlertType]?.label.toLowerCase()} alerts.`}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredAlerts.map((alert) => {
+      {/* Empty State */}
+      {alerts.length === 0 ? (
+        <Card className="bg-slate-800/50 border-slate-700">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mb-4">
+              <Bell className="h-8 w-8 text-slate-500" />
+            </div>
+            <h3 className="text-lg font-medium text-white mb-2">No alerts yet</h3>
+            <p className="text-slate-400 text-center max-w-sm">
+              When there are significant changes in your brand perception, you'll see alerts here.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        /* Alert List */
+        <div className="space-y-3">
+          {alerts.map((alert) => {
             const config = alertTypeConfig[alert.type]
             const Icon = config.icon
+
             return (
               <Card
                 key={alert.id}
-                className={`cursor-pointer border-l-4 transition-all hover:shadow-md ${config.borderColor} ${
+                className={`bg-slate-800/50 border-slate-700 border-l-4 ${config.borderColor} cursor-pointer hover:bg-slate-800 transition-colors ${
                   !alert.read ? "bg-blue-500/5" : ""
                 }`}
                 onClick={() => handleAlertClick(alert)}
               >
-                <CardContent className="flex items-start gap-4 p-4">
-                  <div className={`rounded-lg p-2 ${config.bgColor}`}>
-                    <Icon className={`h-5 w-5 ${config.color}`} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        {!alert.read && <span className="h-2 w-2 rounded-full bg-blue-500" />}
-                        <h3 className={`font-medium ${!alert.read ? "text-foreground" : "text-muted-foreground"}`}>
-                          {alert.title}
-                        </h3>
-                      </div>
-                      <span className="shrink-0 text-xs text-muted-foreground">{alert.time}</span>
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`p-2 rounded-lg ${config.bgColor}`}>
+                      <Icon className={`h-5 w-5 ${config.color}`} />
                     </div>
-                    <p className="line-clamp-2 text-sm text-muted-foreground">{alert.message}</p>
-                    {alert.data && (
-                      <div className="mt-2 flex items-center gap-3">
-                        {alert.data.change !== undefined && (
-                          <span
-                            className={`flex items-center gap-1 text-sm font-medium ${
-                              alert.data.change > 0 ? "text-green-500" : "text-red-500"
-                            }`}
-                          >
-                            {alert.data.change > 0 ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )}
-                            {Math.abs(alert.data.change)} points
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {!alert.read && <span className="w-2 h-2 rounded-full bg-blue-500" />}
+                          <h3 className="font-medium text-white">{alert.title}</h3>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500 whitespace-nowrap">
+                            {formatTimeAgo(alert.created_at)}
                           </span>
-                        )}
-                        {alert.data.metric && (
-                          <span className="rounded bg-muted px-2 py-0.5 text-xs">{alert.data.metric}</span>
-                        )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteAlert(alert.id)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-400" />
+                          </Button>
+                        </div>
                       </div>
-                    )}
+                      <p className="text-sm text-slate-400 mt-1 line-clamp-2">{alert.message}</p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-slate-500 flex-shrink-0" />
                   </div>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                 </CardContent>
               </Card>
             )
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
 
       {/* Alert Detail Modal */}
-      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={showDetail} onOpenChange={setShowDetail}>
+        <DialogContent className="bg-slate-900 border-slate-700 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white">{selectedAlert?.title}</DialogTitle>
+          </DialogHeader>
           {selectedAlert && (
-            <>
-              <DialogHeader>
-                <div className="flex items-center gap-3">
-                  <div className={`rounded-lg p-2 ${alertTypeConfig[selectedAlert.type].bgColor}`}>
-                    {(() => {
-                      const Icon = alertTypeConfig[selectedAlert.type].icon
-                      return <Icon className={`h-5 w-5 ${alertTypeConfig[selectedAlert.type].color}`} />
-                    })()}
+            <div className="space-y-4">
+              <p className="text-slate-300">{selectedAlert.message}</p>
+
+              {selectedAlert.data && (
+                <div className="space-y-4">
+                  {/* Mini Chart */}
+                  <div className="h-32 bg-slate-800 rounded-lg p-4">
+                    <AlertChart data={selectedAlert.data} type={selectedAlert.type} />
                   </div>
-                  <div>
-                    <DialogTitle>{selectedAlert.title}</DialogTitle>
-                    <p className="text-sm text-muted-foreground">{selectedAlert.time}</p>
-                  </div>
+
+                  {/* Metrics */}
+                  {selectedAlert.data.from !== undefined && selectedAlert.data.to !== undefined && (
+                    <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                      <div className="text-center">
+                        <p className="text-xs text-slate-500">Before</p>
+                        <p className="text-lg font-bold text-white">{selectedAlert.data.from}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {selectedAlert.data.change && selectedAlert.data.change > 0 ? (
+                          <ArrowUp className="h-5 w-5 text-green-500" />
+                        ) : (
+                          <ArrowDown className="h-5 w-5 text-red-500" />
+                        )}
+                        <span
+                          className={`font-bold ${
+                            selectedAlert.data.change && selectedAlert.data.change > 0
+                              ? "text-green-500"
+                              : "text-red-500"
+                          }`}
+                        >
+                          {selectedAlert.data.change && selectedAlert.data.change > 0 ? "+" : ""}
+                          {selectedAlert.data.change}
+                        </span>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-slate-500">After</p>
+                        <p className="text-lg font-bold text-white">{selectedAlert.data.to}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </DialogHeader>
+              )}
 
-              <div className="space-y-4">
-                {/* Mini Chart */}
-                {selectedAlert.data && (
-                  <div className="h-32 rounded-lg bg-muted/50 p-3">
-                    <AlertChart data={getChartData(selectedAlert)} />
-                  </div>
-                )}
-
-                <p className="text-sm">{selectedAlert.message}</p>
-
-                {/* Possible Causes */}
-                <div className="rounded-lg border p-3">
-                  <h4 className="mb-2 text-sm font-medium">Possible Causes</h4>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    <li className="flex items-center gap-2">
-                      <AlertCircle className="h-3 w-3" />
-                      Recent competitor marketing campaign
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <AlertCircle className="h-3 w-3" />
-                      Product launch timing
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <AlertCircle className="h-3 w-3" />
-                      Social media sentiment shift
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Recommended Actions */}
-                <div className="rounded-lg border p-3">
-                  <h4 className="mb-2 text-sm font-medium">Recommended Actions</h4>
-                  <ol className="space-y-1 text-sm text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                        1
-                      </span>
-                      Review competitor's recent campaigns and messaging
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                        2
-                      </span>
-                      Analyze customer feedback for recurring themes
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                        3
-                      </span>
-                      Consider targeted content addressing perception gap
-                    </li>
-                  </ol>
-                </div>
-
-                <Button className="w-full" onClick={() => setIsDetailOpen(false)}>
-                  View Full Report
-                </Button>
-              </div>
-            </>
+              <div className="text-xs text-slate-500">{formatTimeAgo(selectedAlert.created_at)}</div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
 
       {/* Settings Sheet */}
-      <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <SheetContent>
+      <Sheet open={showSettings} onOpenChange={setShowSettings}>
+        <SheetContent className="bg-slate-900 border-slate-700">
           <SheetHeader>
-            <SheetTitle>Alert Settings</SheetTitle>
+            <SheetTitle className="text-white">Alert Settings</SheetTitle>
           </SheetHeader>
-
-          <div className="mt-6 space-y-6">
+          <div className="space-y-6 mt-6">
             {/* Email Notifications */}
             <div className="flex items-center justify-between">
               <div>
-                <Label>Email Notifications</Label>
-                <p className="text-sm text-muted-foreground">Receive alerts via email</p>
+                <Label className="text-white">Email Notifications</Label>
+                <p className="text-sm text-slate-400">Receive alerts via email</p>
               </div>
-              <Switch checked={emailEnabled} onCheckedChange={setEmailEnabled} />
+              <Switch
+                checked={alertSettings.emailEnabled}
+                onCheckedChange={(checked) => setAlertSettings({ ...alertSettings, emailEnabled: checked })}
+              />
             </div>
 
-            {/* Score Drop Alerts */}
-            <div className="space-y-3 rounded-lg border p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Score Drop Alerts</Label>
-                  <p className="text-sm text-muted-foreground">Alert when scores fall significantly</p>
-                </div>
-                <Switch checked={scoreDropEnabled} onCheckedChange={setScoreDropEnabled} />
-              </div>
-              {scoreDropEnabled && (
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm text-muted-foreground">Threshold:</Label>
-                  <Select value={scoreDropThreshold} onValueChange={setScoreDropThreshold}>
-                    <SelectTrigger className="w-24">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="3">3 points</SelectItem>
-                      <SelectItem value="5">5 points</SelectItem>
-                      <SelectItem value="10">10 points</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+            {/* Score Drop Threshold */}
+            <div className="space-y-2">
+              <Label className="text-white">Score Drop Threshold</Label>
+              <p className="text-sm text-slate-400">Alert when score drops by this many points</p>
+              <Select
+                value={alertSettings.scoreDropThreshold.toString()}
+                onValueChange={(value) =>
+                  setAlertSettings({ ...alertSettings, scoreDropThreshold: Number.parseInt(value) })
+                }
+              >
+                <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-700">
+                  <SelectItem value="3">3 points</SelectItem>
+                  <SelectItem value="5">5 points</SelectItem>
+                  <SelectItem value="10">10 points</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Competitor Alerts */}
-            <div className="space-y-3 rounded-lg border p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Competitor Rise Alerts</Label>
-                  <p className="text-sm text-muted-foreground">Alert when competitors gain ground</p>
-                </div>
-                <Switch checked={competitorEnabled} onCheckedChange={setCompetitorEnabled} />
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-white">Competitor Alerts</Label>
+                <p className="text-sm text-slate-400">Get notified when competitors improve</p>
               </div>
-              {competitorEnabled && (
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm text-muted-foreground">Threshold:</Label>
-                  <Select value={competitorThreshold} onValueChange={setCompetitorThreshold}>
-                    <SelectTrigger className="w-24">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="3">3 points</SelectItem>
-                      <SelectItem value="5">5 points</SelectItem>
-                      <SelectItem value="10">10 points</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <Switch
+                checked={alertSettings.competitorAlerts}
+                onCheckedChange={(checked) => setAlertSettings({ ...alertSettings, competitorAlerts: checked })}
+              />
             </div>
 
             {/* Weekly Digest */}
             <div className="flex items-center justify-between">
               <div>
-                <Label>Weekly Digest</Label>
-                <p className="text-sm text-muted-foreground">Get a summary every Monday</p>
+                <Label className="text-white">Weekly Digest</Label>
+                <p className="text-sm text-slate-400">Receive a weekly summary email</p>
               </div>
-              <Switch checked={weeklyDigest} onCheckedChange={setWeeklyDigest} />
+              <Switch
+                checked={alertSettings.weeklyDigest}
+                onCheckedChange={(checked) => setAlertSettings({ ...alertSettings, weeklyDigest: checked })}
+              />
             </div>
 
-            {/* Quiet Hours */}
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Quiet Hours</Label>
-                <p className="text-sm text-muted-foreground">No alerts 10pm - 8am</p>
-              </div>
-              <Switch checked={quietHoursEnabled} onCheckedChange={setQuietHoursEnabled} />
-            </div>
-
-            <Button className="w-full" onClick={() => setIsSettingsOpen(false)}>
+            {/* Save Button */}
+            <Button className="w-full" onClick={handleSaveSettings}>
               Save Settings
             </Button>
           </div>
