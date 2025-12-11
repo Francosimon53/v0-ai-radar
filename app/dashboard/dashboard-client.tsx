@@ -53,10 +53,11 @@ interface DashboardData {
 interface PlanSummary {
   northStarGoal: string
   quickWins: Array<{
-    id: string
+    id?: string
     title: string
     description: string
   }>
+  backlogCount?: number
 }
 
 interface AnalysisResult {
@@ -64,7 +65,7 @@ interface AnalysisResult {
   analysisId: string
   brandScore: number
   processingTime: number
-  remaining: number
+  remaining?: number
   planSummary?: PlanSummary
 }
 

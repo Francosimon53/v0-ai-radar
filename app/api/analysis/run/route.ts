@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
       processingTime: Date.now() - startTime,
       result,
       // Strategy plan summary for quick access
-      strategyPlan: strategyPlan
+      planSummary: strategyPlan
         ? {
             northStarGoal: strategyPlan.northStarGoal,
             quickWins: strategyPlan.plan90_30_7?.quickWins || [],
