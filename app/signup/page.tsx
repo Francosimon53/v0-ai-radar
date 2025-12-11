@@ -58,16 +58,33 @@ export default function SignupPage() {
     setIsLoading(true)
 
     try {
-      const supabase = createClient()
+      console.log("[v0] Checking Supabase env vars:", {
+        hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + "...",
+      })
 
+      let supabase
+      try {
+        supabase = createClient()
+        console.log("[v0] Supabase client created successfully")
+      } catch (clientError: any) {
+        console.error("[v0] Failed to create Supabase client:", clientError)
+        setAuthError(`Failed to connect to authentication service: ${clientError.message}`)
+        setIsLoading(false)
+        return
+      }
+
+      const redirectUrl =
+        process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard/setup`
+      console.log("[v0] Using redirect URL:", redirectUrl)
       console.log("[v0] Attempting signup with email:", formData.email)
 
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard/setup`,
+          emailRedirectTo: redirectUrl,
           data: {
             full_name: formData.name,
             company: formData.company,
@@ -75,24 +92,44 @@ export default function SignupPage() {
         },
       })
 
-      console.log("[v0] Signup response:", { data, error })
+      console.log("[v0] Signup response:", {
+        user: data?.user?.id,
+        session: !!data?.session,
+        error: error?.message,
+        errorCode: error?.status,
+      })
 
       if (error) {
-        console.log("[v0] Signup error:", error.message, error.status)
-        setAuthError(error.message)
+        console.error("[v0] Signup error details:", {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+        })
+        if (error.message.includes("already registered")) {
+          setAuthError("This email is already registered. Please sign in instead.")
+        } else if (error.message.includes("valid email")) {
+          setAuthError("Please enter a valid email address.")
+        } else if (error.message.includes("Password")) {
+          setAuthError(error.message)
+        } else {
+          setAuthError(error.message || "Failed to create account. Please try again.")
+        }
         setIsLoading(false)
         return
       }
 
       if (data.user && !data.session) {
+        console.log("[v0] User created, confirmation email sent")
         setAuthError("Check your email to confirm your account before signing in.")
       } else if (data.session) {
+        console.log("[v0] User created with session, redirecting...")
         router.push("/dashboard/setup")
       } else {
+        console.log("[v0] Unexpected state - no user or session")
         setAuthError("Signup completed. Please check your email to confirm your account.")
       }
     } catch (err: any) {
-      console.log("[v0] Caught error:", err)
+      console.error("[v0] Caught unexpected error:", err)
       setAuthError(err?.message || "An unexpected error occurred. Please try again.")
     } finally {
       setIsLoading(false)
