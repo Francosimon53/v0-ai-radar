@@ -1,125 +1,113 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import {
+  Sparkles,
   TrendingUp,
   TrendingDown,
-  ChevronRight,
-  Loader2,
-  Sparkles,
-  Zap,
   Target,
+  Shield,
+  AlertTriangle,
+  Lightbulb,
+  Zap,
   BarChart3,
+  Users,
+  Brain,
+  CheckCircle2,
+  Loader2,
+  RefreshCw,
   Compass,
   Rocket,
-  CheckCircle2,
-  AlertCircle,
-  ArrowUpRight,
-  Users,
-  Activity,
-  Brain,
+  ChevronRight,
 } from "lucide-react"
-import { XAxis, YAxis, ResponsiveContainer, Tooltip, Area, AreaChart } from "recharts"
-import Link from "next/link"
 
 interface DashboardData {
-  hasConfig: boolean
-  brand: {
-    name: string
-    score: number
-    previousScore: number | null
-    trend: number
-    rank: number
-    totalCompetitors: number
-    shareOfVoice: number
-    competitorGap: number
-    sentiment: string
-    nextAnalysis: number
-    lastUpdated: string
-  } | null
-  latestReport: any
-  recentAlerts: any[]
-  analysisHistory: any[]
-  competitors: string[]
-  configId: string | null
-  metrics: {
-    questionsTracked: number
-    competitorsCount: number
-    analysesRun: number
-    activeAlerts: number
-  }
-}
-
-interface PlanSummary {
-  northStarGoal: string
-  quickWins: Array<{
-    id?: string
-    title: string
-    description: string
-  }>
-  backlogCount?: number
+  brand: string
+  configId: string
+  score: number
+  previousScore: number | null
+  shareOfVoice: number
+  sentiment: string
+  competitorsCount: number
+  analysisCount: number
+  lastAnalysis: string | null
 }
 
 interface AnalysisResult {
   success: boolean
-  analysisId: string
   brandScore: number
-  processingTime: number
-  remaining?: number
-  planSummary?: PlanSummary
+  shareOfVoice: number
+  sentiment: string
+  summary: string
+  result: {
+    strengths: string[]
+    weaknesses: string[]
+    opportunities: string[]
+    threats: string[]
+    modelBreakdown: { model: string; score: number; sentiment: string }[]
+    competitorScores: { name: string; score: number; shareOfVoice: number }[]
+  }
+  planSummary?: {
+    northStarGoal: string
+    quickWins: { title: string; description: string }[]
+    backlogCount: number
+  }
 }
 
 export default function DashboardClient() {
-  const { toast } = useToast()
   const [data, setData] = useState<DashboardData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [isRunningAnalysis, setIsRunningAnalysis] = useState(false)
-  const [analysisError, setAnalysisError] = useState<string | null>(null)
   const [latestAnalysis, setLatestAnalysis] = useState<AnalysisResult | null>(null)
-
-  useEffect(() => {
-    loadDashboardData()
-  }, [])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isRunningAnalysis, setIsRunningAnalysis] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
+  const router = useRouter()
 
   const loadDashboardData = async () => {
-    setLoadError(null)
     try {
       const response = await fetch("/api/dashboard")
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`API returned ${response.status}: ${errorText}`)
+        if (response.status === 401) {
+          router.push("/login")
+          return
+        }
+        throw new Error("Failed to load dashboard")
       }
       const result = await response.json()
       setData(result)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error"
-      setLoadError(message)
+    } catch (err: any) {
+      setError(err.message)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const runAnalysis = async () => {
-    setAnalysisError(null)
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
 
+  const runAnalysis = async () => {
     if (!data?.configId) {
       toast({
         title: "Setup Required",
         description: "Please complete the setup wizard first.",
         variant: "destructive",
       })
+      router.push("/dashboard/setup")
       return
     }
 
     setIsRunningAnalysis(true)
+    setLatestAnalysis(null)
 
     try {
       toast({
         title: "Analysis Started",
-        description: "Analyzing your brand across AI models (30-60 seconds)...",
+        description: "Analyzing your brand with AI models (30-60 seconds)...",
       })
 
       const response = await fetch("/api/analysis/run", {
@@ -131,23 +119,20 @@ export default function DashboardClient() {
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || result.message || `Analysis failed with status ${response.status}`)
+        throw new Error(result.error || result.message || "Analysis failed")
       }
 
       setLatestAnalysis(result)
+      loadDashboardData()
 
       toast({
         title: "Analysis Complete",
         description: `Brand score: ${result.brandScore}/100`,
       })
-
-      loadDashboardData()
-    } catch (error: any) {
-      const message = error.message || "An error occurred"
-      setAnalysisError(message)
+    } catch (err: any) {
       toast({
         title: "Analysis Failed",
-        description: message,
+        description: err.message,
         variant: "destructive",
       })
     } finally {
@@ -155,474 +140,468 @@ export default function DashboardClient() {
     }
   }
 
-  // Loading state
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="h-12 w-12 rounded-full border-2 border-zinc-800 border-t-blue-500 animate-spin" />
-          </div>
-          <p className="text-zinc-500 text-sm">Loading dashboard...</p>
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
     )
   }
 
-  // Error state
-  if (loadError) {
+  if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-        <div className="h-16 w-16 rounded-2xl bg-red-500/10 flex items-center justify-center mb-4">
-          <AlertCircle className="h-8 w-8 text-red-500" />
-        </div>
-        <h1 className="text-xl font-semibold text-white mb-2">Failed to Load</h1>
-        <p className="text-zinc-500 mb-6 max-w-md text-sm">{loadError}</p>
-        <Button
-          onClick={() => {
-            setIsLoading(true)
-            loadDashboardData()
-          }}
-          className="bg-zinc-800 hover:bg-zinc-700 text-white"
-        >
-          Try Again
-        </Button>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md">
+          <CardContent className="pt-6 text-center space-y-4">
+            <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+            <h3 className="font-semibold text-lg">Error Loading Dashboard</h3>
+            <p className="text-muted-foreground">{error}</p>
+            <Button onClick={() => window.location.reload()}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
-  // No config - show welcome
-  if (!data?.hasConfig) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-        <div className="relative mb-6">
-          <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center">
-            <Activity className="h-10 w-10 text-blue-400" />
-          </div>
-          <div className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
-            <Sparkles className="h-3 w-3 text-white" />
-          </div>
-        </div>
-        <h1 className="text-2xl font-bold text-white mb-2">Welcome to AI Radar</h1>
-        <p className="text-zinc-400 mb-8 max-w-md">
-          Discover how AI models perceive your brand and stay ahead of the competition.
-        </p>
-        <Link href="/dashboard/setup">
-          <Button className="gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white border-0 shadow-lg shadow-blue-500/25 px-6">
-            Start Setup
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </Link>
-      </div>
-    )
+  const scoreColor = (score: number) => {
+    if (score >= 70) return "text-emerald-500"
+    if (score >= 50) return "text-amber-500"
+    return "text-red-500"
   }
 
-  const brand = data.brand!
-  const hasData = brand.score > 0
-
-  // Prepare chart data
-  const chartData =
-    data.analysisHistory.length > 0
-      ? data.analysisHistory.map((item: any) => ({
-          date: new Date(item.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-          score: item.score || 0,
-        }))
-      : [{ date: "Now", score: brand.score }]
-
-  // Score color based on value
-  const getScoreColor = (score: number) => {
-    if (score >= 70) return "from-emerald-500 to-teal-400"
-    if (score >= 40) return "from-amber-500 to-orange-400"
-    return "from-red-500 to-rose-400"
+  const sentimentIcon = (sentiment: string) => {
+    if (sentiment === "positive") return <TrendingUp className="h-5 w-5 text-emerald-500" />
+    if (sentiment === "negative") return <TrendingDown className="h-5 w-5 text-red-500" />
+    return <BarChart3 className="h-5 w-5 text-amber-500" />
   }
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section - Brand Score */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border border-zinc-800/50 p-6 lg:p-8">
-        {/* Background decoration */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-500/10 to-cyan-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-
-        <div className="relative flex flex-col lg:flex-row lg:items-center gap-8">
-          {/* Score Circle */}
-          <div className="relative flex-shrink-0">
-            <svg className="w-44 h-44 -rotate-90" viewBox="0 0 120 120">
-              <circle
-                cx="60"
-                cy="60"
-                r="52"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="8"
-                className="text-zinc-800"
-              />
-              <circle
-                cx="60"
-                cy="60"
-                r="52"
-                fill="none"
-                stroke="url(#scoreGradient)"
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray="327"
-                strokeDashoffset={327 - (327 * brand.score) / 100}
-                className="transition-all duration-1000 ease-out"
-              />
-              <defs>
-                <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#3b82f6" />
-                  <stop offset="100%" stopColor="#06b6d4" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-5xl font-bold text-white">{brand.score}</span>
-              <span className="text-sm text-zinc-500">of 100</span>
-            </div>
-          </div>
-
-          {/* Brand Info */}
-          <div className="flex-1 space-y-4">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl font-bold text-white">{brand.name}</h1>
-                {brand.trend !== 0 && (
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      brand.trend > 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
-                    }`}
-                  >
-                    {brand.trend > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    {brand.trend > 0 ? "+" : ""}
-                    {brand.trend}
-                  </span>
-                )}
-              </div>
-              <p className="text-zinc-500">Brand Health Score</p>
-            </div>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-4 lg:gap-8">
-              <div className="space-y-1">
-                <p className="text-xs uppercase tracking-wider text-zinc-500">Share of Voice</p>
-                <p className="text-2xl font-semibold text-white">{brand.shareOfVoice}%</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs uppercase tracking-wider text-zinc-500">Sentiment</p>
-                <p className="text-2xl font-semibold text-white capitalize">{brand.sentiment}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs uppercase tracking-wider text-zinc-500">Rank</p>
-                <p className="text-2xl font-semibold text-white">#{brand.rank}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Mini Trend Chart */}
-          {chartData.length > 1 && (
-            <div className="w-full lg:w-48 h-24">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Area type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={2} fill="url(#chartGradient)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+    <div className="space-y-8 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{data?.brand || "Your Brand"}</h1>
+          <p className="text-muted-foreground mt-1">AI Brand Perception Analysis</p>
         </div>
+        <Button
+          onClick={runAnalysis}
+          disabled={isRunningAnalysis}
+          size="lg"
+          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg"
+        >
+          {isRunningAnalysis ? (
+            <>
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              Analyzing...
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-5 w-5 mr-2" />
+              Run Analysis
+            </>
+          )}
+        </Button>
       </div>
 
-      {/* Error Display */}
-      {analysisError && (
-        <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-400 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="font-medium text-red-400">Analysis Failed</h3>
-              <p className="text-sm text-zinc-400 mt-1">{analysisError}</p>
+      {/* Analysis Running State */}
+      {isRunningAnalysis && (
+        <Card className="border-blue-500/50 bg-blue-500/5">
+          <CardContent className="py-8">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <div className="relative">
+                <div className="h-16 w-16 rounded-full border-4 border-blue-500/30 border-t-blue-500 animate-spin" />
+                <Brain className="h-8 w-8 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500" />
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-lg">Analyzing {data?.brand}</h3>
+                <p className="text-muted-foreground">Querying AI models for brand perception data...</p>
+              </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-zinc-500 hover:text-white hover:bg-zinc-800"
-              onClick={() => setAnalysisError(null)}
-            >
-              Dismiss
-            </Button>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* CTA for First Analysis */}
-      {!hasData && (
-        <div className="rounded-xl bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <Brain className="h-6 w-6 text-blue-400" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-white">Ready to analyze {brand.name}</h3>
-                <p className="text-sm text-zinc-400">Run your first AI analysis to discover your brand perception</p>
-              </div>
-            </div>
-            <Button
-              onClick={runAnalysis}
-              disabled={isRunningAnalysis}
-              className="gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white border-0 shadow-lg shadow-blue-500/25"
-            >
-              {isRunningAnalysis ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  Run Analysis
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Strategic Plan Results */}
-      {latestAnalysis?.planSummary && (
-        <div className="rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-900/50 border border-zinc-800/50 overflow-hidden">
-          <div className="p-6 border-b border-zinc-800/50">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
-                <Compass className="h-5 w-5 text-purple-400" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-white">Strategic Plan</h2>
-                <p className="text-sm text-zinc-500">AI-generated recommendations</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6 space-y-6">
-            {/* North Star Goal */}
-            <div className="rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <Target className="h-5 w-5 text-purple-400" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-purple-400">North Star Goal</span>
-              </div>
-              <p className="text-lg font-medium text-white leading-relaxed">
-                {latestAnalysis.planSummary.northStarGoal}
-              </p>
-            </div>
-
-            {/* Quick Wins */}
-            {latestAnalysis.planSummary.quickWins && latestAnalysis.planSummary.quickWins.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <Rocket className="h-5 w-5 text-emerald-400" />
-                  <span className="font-semibold text-white">Quick Wins</span>
-                  <span className="text-xs text-zinc-500 ml-1">Next 7 days</span>
+      {/* Latest Analysis Results */}
+      {latestAnalysis && !isRunningAnalysis && (
+        <div className="space-y-6">
+          {/* Score Hero */}
+          <Card className="overflow-hidden">
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
+              <div className="grid md:grid-cols-4 gap-8 items-center">
+                {/* Score Circle */}
+                <div className="flex flex-col items-center">
+                  <div className="relative w-32 h-32">
+                    <svg className="w-full h-full -rotate-90">
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="56"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        fill="none"
+                        className="text-slate-700"
+                      />
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="56"
+                        stroke="url(#scoreGradient)"
+                        strokeWidth="8"
+                        fill="none"
+                        strokeDasharray={`${(latestAnalysis.brandScore / 100) * 352} 352`}
+                        strokeLinecap="round"
+                      />
+                      <defs>
+                        <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="#3b82f6" />
+                          <stop offset="100%" stopColor="#06b6d4" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-4xl font-bold text-white">{latestAnalysis.brandScore}</span>
+                      <span className="text-sm text-slate-400">/100</span>
+                    </div>
+                  </div>
+                  <span className="mt-2 text-slate-300 font-medium">Brand Score</span>
                 </div>
-                <div className="grid gap-3">
-                  {latestAnalysis.planSummary.quickWins.map((win, idx) => (
-                    <div
-                      key={win.id || idx}
-                      className="flex items-start gap-3 p-4 rounded-xl bg-zinc-800/50 border border-zinc-700/50 hover:border-zinc-600/50 transition-colors"
-                    >
-                      <div className="h-6 w-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+
+                {/* Key Metrics */}
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-slate-400 text-sm">Share of Voice</p>
+                    <p className="text-2xl font-bold text-white">{latestAnalysis.shareOfVoice}%</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-sm">Sentiment</p>
+                    <div className="flex items-center gap-2">
+                      {sentimentIcon(latestAnalysis.sentiment)}
+                      <span className="text-xl font-semibold text-white capitalize">{latestAnalysis.sentiment}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Summary */}
+                <div className="md:col-span-2">
+                  <p className="text-slate-400 text-sm mb-2">Executive Summary</p>
+                  <p className="text-slate-200 leading-relaxed">{latestAnalysis.summary}</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* SWOT Analysis */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="border-emerald-500/30 bg-emerald-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2 text-emerald-600">
+                  <Shield className="h-4 w-4" />
+                  Strengths
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {latestAnalysis.result.strengths.map((s, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2 text-amber-600">
+                  <AlertTriangle className="h-4 w-4" />
+                  Weaknesses
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {latestAnalysis.result.weaknesses.map((w, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 mt-2 flex-shrink-0" />
+                      <span>{w}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="border-blue-500/30 bg-blue-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2 text-blue-600">
+                  <Lightbulb className="h-4 w-4" />
+                  Opportunities
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {latestAnalysis.result.opportunities.map((o, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2">
+                      <Zap className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                      <span>{o}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="border-red-500/30 bg-red-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2 text-red-600">
+                  <Target className="h-4 w-4" />
+                  Threats
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {latestAnalysis.result.threats.map((t, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-red-500 mt-2 flex-shrink-0" />
+                      <span>{t}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Model Breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-primary" />
+                AI Model Breakdown
+              </CardTitle>
+              <CardDescription>How each AI model perceives your brand</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-4">
+                {latestAnalysis.result.modelBreakdown.map((model, i) => (
+                  <div key={i} className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Brain className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <p className="font-medium text-white">{win.title}</p>
-                        <p className="text-sm text-zinc-400 mt-1">{win.description}</p>
+                        <p className="font-medium">{model.model}</p>
+                        <p className="text-sm text-muted-foreground capitalize">{model.sentiment} sentiment</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-2xl font-bold ${scoreColor(model.score)}`}>{model.score}</p>
+                      <p className="text-xs text-muted-foreground">/100</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Competitor Comparison */}
+          {latestAnalysis.result.competitorScores.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  Competitor Comparison
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Your Brand */}
+                  <div className="flex items-center gap-4 p-4 rounded-lg bg-primary/10 border border-primary/20">
+                    <div className="flex-1">
+                      <p className="font-semibold">{data?.brand} (You)</p>
+                      <div className="h-2 rounded-full bg-muted mt-2 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"
+                          style={{ width: `${latestAnalysis.shareOfVoice}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-primary">{latestAnalysis.brandScore}</p>
+                      <p className="text-xs text-muted-foreground">{latestAnalysis.shareOfVoice}% SoV</p>
+                    </div>
+                  </div>
+
+                  {/* Competitors */}
+                  {latestAnalysis.result.competitorScores.map((comp, i) => (
+                    <div key={i} className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
+                      <div className="flex-1">
+                        <p className="font-medium">{comp.name}</p>
+                        <div className="h-2 rounded-full bg-muted mt-2 overflow-hidden">
+                          <div
+                            className="h-full bg-slate-400 rounded-full"
+                            style={{ width: `${comp.shareOfVoice}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-2xl font-bold ${scoreColor(comp.score)}`}>{comp.score}</p>
+                        <p className="text-xs text-muted-foreground">{comp.shareOfVoice}% SoV</p>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              </CardContent>
+            </Card>
+          )}
 
-            <div className="flex justify-end pt-2">
-              <Link href="/dashboard/reports">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
-                >
-                  View Full Plan
-                  <ArrowUpRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
-          </div>
+          {/* Strategic Plan */}
+          {latestAnalysis.planSummary && (
+            <Card className="overflow-hidden">
+              <div className="bg-gradient-to-br from-violet-950 via-slate-900 to-slate-900">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-white">
+                    <Compass className="h-5 w-5 text-violet-400" />
+                    Strategic Plan
+                  </CardTitle>
+                  <CardDescription className="text-slate-400">
+                    AI-generated action plan based on your analysis
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* North Star Goal */}
+                  <div className="p-4 rounded-lg bg-violet-500/10 border border-violet-500/20">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="h-5 w-5 text-violet-400" />
+                      <span className="text-sm font-medium text-violet-300">North Star Goal</span>
+                    </div>
+                    <p className="text-lg text-white">{latestAnalysis.planSummary.northStarGoal}</p>
+                  </div>
+
+                  {/* Quick Wins */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Rocket className="h-5 w-5 text-emerald-400" />
+                      <span className="text-sm font-medium text-emerald-300">Quick Wins (Next 7 Days)</span>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {latestAnalysis.planSummary.quickWins.slice(0, 4).map((win, i) => (
+                        <div key={i} className="p-3 rounded-lg bg-slate-800/50 border border-slate-700">
+                          <div className="flex items-start gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="font-medium text-white text-sm">{win.title}</p>
+                              <p className="text-xs text-slate-400 mt-1">{win.description}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* View Full Plan */}
+                  <Button
+                    variant="outline"
+                    className="w-full border-violet-500/30 text-violet-300 hover:bg-violet-500/10 bg-transparent"
+                    onClick={() => router.push("/dashboard/reports")}
+                  >
+                    View Full Strategic Plan
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </CardContent>
+              </div>
+            </Card>
+          )}
         </div>
       )}
 
+      {/* Empty State - No Analysis Yet */}
+      {!latestAnalysis && !isRunningAnalysis && (
+        <Card className="border-dashed">
+          <CardContent className="py-16">
+            <div className="flex flex-col items-center justify-center text-center space-y-4">
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold">Ready to Analyze {data?.brand}</h3>
+                <p className="text-muted-foreground mt-1 max-w-md">
+                  Run your first AI analysis to see how GPT-4 and Claude perceive your brand compared to competitors.
+                </p>
+              </div>
+              <Button
+                onClick={runAnalysis}
+                size="lg"
+                className="mt-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+              >
+                <Sparkles className="h-5 w-5 mr-2" />
+                Run First Analysis
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="AI Models" value="2" subtitle="GPT-4o & Claude" icon={Brain} color="blue" />
-        <StatCard
-          title="Competitors"
-          value={data.metrics.competitorsCount.toString()}
-          subtitle="being tracked"
-          icon={Users}
-          color="purple"
-        />
-        <StatCard
-          title="Analyses"
-          value={data.metrics.analysesRun.toString()}
-          subtitle="this month"
-          icon={Activity}
-          color="emerald"
-        />
-        <StatCard
-          title="Gap"
-          value={`${brand.competitorGap >= 0 ? "+" : ""}${brand.competitorGap}`}
-          subtitle="vs competitors"
-          icon={brand.competitorGap >= 0 ? TrendingUp : TrendingDown}
-          color={brand.competitorGap >= 0 ? "emerald" : "red"}
-        />
-      </div>
-
-      {/* Main Content Grid */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Chart */}
-        <div className="lg:col-span-2 rounded-xl bg-zinc-900 border border-zinc-800/50 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-white">Score History</h2>
-            <div className="flex items-center gap-2 text-xs text-zinc-500">
-              <div className="h-2 w-2 rounded-full bg-blue-500" />
-              Brand Score
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Users className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{data?.competitorsCount || 0}</p>
+                <p className="text-sm text-muted-foreground">Competitors</p>
+              </div>
             </div>
-          </div>
-          {chartData.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
-                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="date" stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#52525b" fontSize={12} domain={[0, 100]} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#18181b",
-                      border: "1px solid #27272a",
-                      borderRadius: "8px",
-                      fontSize: "12px",
-                    }}
-                    labelStyle={{ color: "#a1a1aa" }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="score"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    fill="url(#areaGradient)"
-                    dot={{ fill: "#3b82f6", strokeWidth: 0, r: 4 }}
-                    activeDot={{ fill: "#3b82f6", strokeWidth: 0, r: 6 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <BarChart3 className="h-5 w-5 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{data?.analysisCount || 0}</p>
+                <p className="text-sm text-muted-foreground">Analyses</p>
+              </div>
             </div>
-          ) : (
-            <div className="h-64 flex items-center justify-center text-zinc-500">
-              Run an analysis to see score history
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                <Brain className="h-5 w-5 text-violet-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">2</p>
+                <p className="text-sm text-muted-foreground">AI Models</p>
+              </div>
             </div>
-          )}
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Quick Actions */}
-        <div className="rounded-xl bg-zinc-900 border border-zinc-800/50 p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Quick Actions</h2>
-          <div className="space-y-3">
-            <Button
-              onClick={runAnalysis}
-              disabled={isRunningAnalysis}
-              className="w-full justify-start gap-3 h-12 bg-zinc-800 hover:bg-zinc-700 text-white border-0"
-            >
-              {isRunningAnalysis ? (
-                <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
-              ) : (
-                <Sparkles className="h-5 w-5 text-blue-400" />
-              )}
-              {isRunningAnalysis ? "Running Analysis..." : "Run New Analysis"}
-            </Button>
-            <Link href="/dashboard/reports" className="block">
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-3 h-12 bg-transparent border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white"
-              >
-                <BarChart3 className="h-5 w-5 text-purple-400" />
-                View Reports
-              </Button>
-            </Link>
-            <Link href="/dashboard/competitors" className="block">
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-3 h-12 bg-transparent border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white"
-              >
-                <Users className="h-5 w-5 text-emerald-400" />
-                Manage Competitors
-              </Button>
-            </Link>
-            <Link href="/dashboard/settings" className="block">
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-3 h-12 bg-transparent border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white"
-              >
-                <Zap className="h-5 w-5 text-amber-400" />
-                Upgrade Plan
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Stat Card Component
-function StatCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-  color,
-}: {
-  title: string
-  value: string
-  subtitle: string
-  icon: any
-  color: "blue" | "purple" | "emerald" | "red" | "amber"
-}) {
-  const colorClasses = {
-    blue: "from-blue-500/20 to-blue-500/5 text-blue-400",
-    purple: "from-purple-500/20 to-purple-500/5 text-purple-400",
-    emerald: "from-emerald-500/20 to-emerald-500/5 text-emerald-400",
-    red: "from-red-500/20 to-red-500/5 text-red-400",
-    amber: "from-amber-500/20 to-amber-500/5 text-amber-400",
-  }
-
-  return (
-    <div className="rounded-xl bg-zinc-900 border border-zinc-800/50 p-5">
-      <div className="flex items-start justify-between mb-3">
-        <div
-          className={`h-10 w-10 rounded-lg bg-gradient-to-br ${colorClasses[color]} flex items-center justify-center`}
-        >
-          <Icon className="h-5 w-5" />
-        </div>
-      </div>
-      <div className="text-2xl font-bold text-white">{value}</div>
-      <div className="text-xs text-zinc-500 mt-1">
-        <span className="text-zinc-400">{title}</span> {subtitle}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{data?.score || 0}</p>
+                <p className="text-sm text-muted-foreground">Last Score</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
