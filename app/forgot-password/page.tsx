@@ -30,19 +30,32 @@ export default function ForgotPasswordPage() {
     setError("")
     setIsLoading(true)
 
-    const supabase = createBrowserClient()
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
-    })
+    try {
+      const supabase = createBrowserClient()
 
-    setIsLoading(false)
+      const redirectUrl = `${window.location.origin}/auth/callback?next=/reset-password`
+      console.log("[v0] Sending reset email to:", email)
+      console.log("[v0] Redirect URL:", redirectUrl)
 
-    if (resetError) {
-      setError(resetError.message)
-      return
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      })
+
+      if (resetError) {
+        console.log("[v0] Supabase error:", resetError)
+        setError(resetError.message)
+        setIsLoading(false)
+        return
+      }
+
+      console.log("[v0] Reset email sent successfully")
+      setIsSubmitted(true)
+    } catch (err) {
+      console.log("[v0] Caught error:", err)
+      setError(err instanceof Error ? err.message : "Failed to send reset email. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsSubmitted(true)
   }
 
   return (
