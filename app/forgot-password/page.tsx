@@ -37,9 +37,16 @@ export default function ForgotPasswordPage() {
       console.log("[v0] Sending reset email to:", email)
       console.log("[v0] Redirect URL:", redirectUrl)
 
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Request timed out. Please try again.")), 15000)
+      })
+
+      const resetPromise = supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirectUrl,
       })
+
+      const { error: resetError } = (await Promise.race([resetPromise, timeoutPromise])) as Awaited<typeof resetPromise>
 
       if (resetError) {
         console.log("[v0] Supabase error:", resetError)
