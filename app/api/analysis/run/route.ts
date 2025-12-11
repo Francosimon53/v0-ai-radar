@@ -25,6 +25,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { configId } = body
 
+    console.log("[v0] Analysis API called with configId:", configId)
+
     if (!configId) {
       return NextResponse.json({ error: "Missing configId" }, { status: 400 })
     }
@@ -36,6 +38,9 @@ export async function POST(request: NextRequest) {
       .eq("id", configId)
       .eq("user_id", user.id)
       .single()
+
+    console.log("[v0] Tracking config fetched:", config)
+    console.log("[v0] Config error:", configError)
 
     if (configError || !config) {
       return NextResponse.json({ error: "Tracking config not found" }, { status: 404 })
@@ -57,13 +62,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const brandName = config.primary_brand || config.name
+    console.log("[v0] Brand name for analysis:", brandName)
+
     // Prepare tracking config for analysis
     const trackingConfig: TrackingConfig = {
-      brand: config.brand,
-      competitors: config.competitors,
-      industry: config.industry,
+      brand: brandName,
+      competitors: config.competitors || [],
+      industry: config.industry || "general",
       userId: user.id,
     }
+
+    console.log("[v0] Tracking config for analysis:", trackingConfig)
 
     // Fetch historical data for trend analysis
     const { data: historyData } = await supabase
@@ -76,7 +86,7 @@ export async function POST(request: NextRequest) {
     const historicalData =
       historyData && historyData.length > 0
         ? {
-            brand: config.brand,
+            brand: brandName,
             dataPoints: historyData.map(
               (h: { timestamp: string; brand_strength_index: number; share_of_voice: number }) => ({
                 date: h.timestamp,
@@ -89,15 +99,16 @@ export async function POST(request: NextRequest) {
         : undefined
 
     // Run the full analysis
-    console.log(`[Analysis] Starting analysis for ${config.brand}...`)
+    console.log(`[v0] Starting analysis for ${brandName}...`)
     const analysisResult = await runFullAnalysis(trackingConfig, historicalData)
+    console.log("[v0] Analysis completed, result:", analysisResult.id)
 
     // Generate PDF report
-    console.log(`[Analysis] Generating PDF report...`)
+    console.log(`[v0] Generating PDF report...`)
     const pdfBuffer = await generateReport(analysisResult, trackingConfig)
 
     // Upload to storage
-    console.log(`[Analysis] Uploading report to storage...`)
+    console.log(`[v0] Uploading report to storage...`)
     const reportPath = await uploadReport(pdfBuffer, user.id, analysisResult.id)
     const reportUrl = await getReportUrl(reportPath)
 
@@ -106,26 +117,26 @@ export async function POST(request: NextRequest) {
       id: analysisResult.id,
       config_id: configId,
       user_id: user.id,
-      brand: config.brand,
+      brand: brandName,
       timestamp: analysisResult.timestamp,
       brand_strength_index: analysisResult.dimensional.brandStrengthIndex,
-      share_of_voice: analysisResult.shareOfVoice[config.brand]?.mentionRate || 0,
+      share_of_voice: analysisResult.shareOfVoice[brandName]?.mentionRate || 0,
       report_path: reportPath,
       full_result: analysisResult,
     })
 
     if (saveError) {
-      console.error("[Analysis] Error saving result:", saveError)
+      console.error("[v0] Error saving result:", saveError)
     }
 
     const { error: reportSaveError } = await supabase.from("reports").insert({
       id: analysisResult.id,
       user_id: user.id,
       config_id: configId,
-      brand: config.brand,
+      brand: brandName,
       score: analysisResult.dimensional.brandStrengthIndex,
       previous_score: historyData?.[0]?.brand_strength_index || null,
-      share_of_voice: analysisResult.shareOfVoice[config.brand]?.mentionRate || 0,
+      share_of_voice: analysisResult.shareOfVoice[brandName]?.mentionRate || 0,
       threats: analysisResult.threats,
       recommendations: analysisResult.synthesis.recommendations,
       strengths: analysisResult.synthesis.strengths,
@@ -135,7 +146,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (reportSaveError) {
-      console.error("[Analysis] Error saving report:", reportSaveError)
+      console.error("[v0] Error saving report:", reportSaveError)
     }
 
     // Record usage
@@ -149,6 +160,8 @@ export async function POST(request: NextRequest) {
 
     const processingTime = Date.now() - startTime
 
+    console.log("[v0] Analysis API complete, returning success")
+
     return NextResponse.json({
       success: true,
       analysisId: analysisResult.id,
@@ -158,7 +171,7 @@ export async function POST(request: NextRequest) {
       remaining: remaining - 1,
     })
   } catch (error) {
-    console.error("[Analysis] Error:", error)
+    console.error("[v0] Analysis error:", error)
     return NextResponse.json(
       { error: "Analysis failed", message: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
