@@ -35,6 +35,37 @@ export async function POST(request: Request) {
 
     console.log("[v0] User authenticated:", user.id)
 
+    const { data: existingProfile, error: profileCheckError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", user.id)
+      .single()
+
+    if (profileCheckError && profileCheckError.code === "PGRST116") {
+      // Profile doesn't exist, create it
+      console.log("[v0] Profile not found, creating one for user:", user.id)
+      const { error: createProfileError } = await supabase.from("profiles").insert({
+        id: user.id,
+        email: user.email,
+        full_name: user.user_metadata?.name || user.user_metadata?.full_name || "",
+        company: user.user_metadata?.company || "",
+        plan: "free",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+
+      if (createProfileError) {
+        console.error("[v0] Failed to create profile:", createProfileError)
+        return NextResponse.json(
+          { error: "Failed to create user profile: " + createProfileError.message },
+          { status: 500 },
+        )
+      }
+      console.log("[v0] Profile created successfully")
+    } else if (existingProfile) {
+      console.log("[v0] Profile already exists:", existingProfile.id)
+    }
+
     // Check if user already has a tracking config
     const { data: existingConfig, error: checkError } = await supabase
       .from("tracking_configs")
