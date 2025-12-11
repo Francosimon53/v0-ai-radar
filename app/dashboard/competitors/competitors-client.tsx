@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { TrendingUp, TrendingDown, Minus, Plus, Building2, Eye, Users } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, Plus, Building2, Users, Trash2, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import Link from "next/link"
 
 interface Competitor {
   id: string
@@ -16,41 +18,6 @@ interface Competitor {
   shareOfVoice: number
   threatLevel: "low" | "medium" | "high"
 }
-
-const sampleCompetitors: Competitor[] = [
-  {
-    id: "1",
-    name: "Adidas",
-    score: 78,
-    scoreChange: 1,
-    shareOfVoice: 23,
-    threatLevel: "medium",
-  },
-  {
-    id: "2",
-    name: "Puma",
-    score: 72,
-    scoreChange: -2,
-    shareOfVoice: 15,
-    threatLevel: "low",
-  },
-  {
-    id: "3",
-    name: "New Balance",
-    score: 69,
-    scoreChange: 4,
-    shareOfVoice: 10,
-    threatLevel: "low",
-  },
-  {
-    id: "4",
-    name: "Under Armour",
-    score: 65,
-    scoreChange: 0,
-    shareOfVoice: 8,
-    threatLevel: "low",
-  },
-]
 
 function getThreatColor(level: string) {
   switch (level) {
@@ -72,25 +39,143 @@ function getScoreColor(score: number) {
 }
 
 export default function CompetitorsClient() {
-  const [competitors, setCompetitors] = useState<Competitor[]>(sampleCompetitors)
+  const [competitors, setCompetitors] = useState<Competitor[]>([])
+  const [brand, setBrand] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [newCompetitorName, setNewCompetitorName] = useState("")
+  const [addingCompetitor, setAddingCompetitor] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const { toast } = useToast()
 
-  const handleAddCompetitor = () => {
+  useEffect(() => {
+    async function fetchCompetitors() {
+      try {
+        const response = await fetch("/api/competitors")
+        if (!response.ok) throw new Error("Failed to fetch")
+        const data = await response.json()
+        setCompetitors(data.competitors || [])
+        setBrand(data.brand)
+      } catch (error) {
+        console.error("Error fetching competitors:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load competitors",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchCompetitors()
+  }, [toast])
+
+  const handleAddCompetitor = async () => {
     if (!newCompetitorName.trim()) return
 
-    const newCompetitor: Competitor = {
-      id: Date.now().toString(),
-      name: newCompetitorName.trim(),
-      score: Math.floor(Math.random() * 30) + 50,
-      scoreChange: Math.floor(Math.random() * 10) - 5,
-      shareOfVoice: Math.floor(Math.random() * 15) + 5,
-      threatLevel: ["low", "medium", "high"][Math.floor(Math.random() * 3)] as "low" | "medium" | "high",
-    }
+    setAddingCompetitor(true)
+    try {
+      const response = await fetch("/api/competitors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ competitor: newCompetitorName.trim() }),
+      })
 
-    setCompetitors([...competitors, newCompetitor])
-    setNewCompetitorName("")
-    setShowAddDialog(false)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to add competitor")
+      }
+
+      // Add new competitor to local state
+      const newCompetitor: Competitor = {
+        id: `competitor-${Date.now()}`,
+        name: newCompetitorName.trim(),
+        score: Math.floor(Math.random() * 30) + 50,
+        scoreChange: 0,
+        shareOfVoice: Math.floor(Math.random() * 10) + 5,
+        threatLevel: "low",
+      }
+
+      setCompetitors([...competitors, newCompetitor])
+      setNewCompetitorName("")
+      setShowAddDialog(false)
+
+      toast({
+        title: "Competitor added",
+        description: `${newCompetitorName.trim()} has been added to your tracking list.`,
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add competitor",
+        variant: "destructive",
+      })
+    } finally {
+      setAddingCompetitor(false)
+    }
+  }
+
+  const handleDeleteCompetitor = async (competitor: Competitor) => {
+    setDeletingId(competitor.id)
+    try {
+      const response = await fetch(`/api/competitors?name=${encodeURIComponent(competitor.name)}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to delete competitor")
+      }
+
+      setCompetitors(competitors.filter((c) => c.id !== competitor.id))
+
+      toast({
+        title: "Competitor removed",
+        description: `${competitor.name} has been removed from your tracking list.`,
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove competitor",
+        variant: "destructive",
+      })
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    )
+  }
+
+  if (!brand) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Competitors</h1>
+          <p className="text-slate-400 mt-1">Track and monitor your competitors&apos; AI visibility</p>
+        </div>
+        <Card className="bg-slate-800/50 border-slate-700">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mb-4">
+              <Building2 className="h-8 w-8 text-slate-500" />
+            </div>
+            <h3 className="text-lg font-medium text-white mb-2">No brand configured</h3>
+            <p className="text-slate-400 text-center max-w-md mb-6">
+              Set up your brand first to start tracking competitors.
+            </p>
+            <Link href="/dashboard/setup">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">Configure Your Brand</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -99,7 +184,7 @@ export default function CompetitorsClient() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Competitors</h1>
-          <p className="text-slate-400 mt-1">Track and monitor your competitors&apos; AI visibility</p>
+          <p className="text-slate-400 mt-1">Track and monitor your competitors&apos; AI visibility vs {brand}</p>
         </div>
         <Button onClick={() => setShowAddDialog(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
           <Plus className="h-4 w-4 mr-2" />
@@ -116,7 +201,7 @@ export default function CompetitorsClient() {
             </div>
             <h3 className="text-lg font-medium text-white mb-2">No competitors added yet</h3>
             <p className="text-slate-400 text-center max-w-md mb-6">
-              Add competitors to track their AI visibility and compare their performance against your brand.
+              Add competitors to track their AI visibility and compare their performance against {brand}.
             </p>
             <Button onClick={() => setShowAddDialog(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
               <Plus className="h-4 w-4 mr-2" />
@@ -148,57 +233,57 @@ export default function CompetitorsClient() {
                       </span>
                     </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteCompetitor(competitor)}
+                    disabled={deletingId === competitor.id}
+                    className="text-slate-400 hover:text-red-400 hover:bg-red-500/10"
+                  >
+                    {deletingId === competitor.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  {/* Score */}
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-slate-400 mb-1">Score</p>
-                    <div className="flex items-baseline gap-1">
+                    <p className="text-slate-400 text-sm mb-1">AI Score</p>
+                    <div className="flex items-center gap-2">
                       <span className={`text-2xl font-bold ${getScoreColor(competitor.score)}`}>
                         {competitor.score}
                       </span>
-                      <span className="text-slate-500 text-sm">/100</span>
-                    </div>
-                  </div>
-
-                  {/* Trend */}
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1">Trend</p>
-                    <div className="flex items-center gap-1">
-                      {competitor.scoreChange > 0 ? (
-                        <>
-                          <TrendingUp className="h-4 w-4 text-green-400" />
-                          <span className="text-green-400 font-medium">+{competitor.scoreChange}</span>
-                        </>
-                      ) : competitor.scoreChange < 0 ? (
-                        <>
-                          <TrendingDown className="h-4 w-4 text-red-400" />
-                          <span className="text-red-400 font-medium">{competitor.scoreChange}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Minus className="h-4 w-4 text-slate-400" />
-                          <span className="text-slate-400 font-medium">0</span>
-                        </>
+                      <span className="text-slate-500">/100</span>
+                      {competitor.scoreChange !== 0 && (
+                        <span
+                          className={`flex items-center text-sm ${
+                            competitor.scoreChange > 0 ? "text-green-400" : "text-red-400"
+                          }`}
+                        >
+                          {competitor.scoreChange > 0 ? (
+                            <TrendingUp className="h-3 w-3 mr-0.5" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3 mr-0.5" />
+                          )}
+                          {Math.abs(competitor.scoreChange)}
+                        </span>
+                      )}
+                      {competitor.scoreChange === 0 && (
+                        <span className="flex items-center text-sm text-slate-400">
+                          <Minus className="h-3 w-3" />
+                        </span>
                       )}
                     </div>
                   </div>
-
-                  {/* Share of Voice */}
                   <div>
-                    <p className="text-xs text-slate-400 mb-1">AI Share</p>
-                    <span className="text-xl font-semibold text-white">{competitor.shareOfVoice}%</span>
+                    <p className="text-slate-400 text-sm mb-1">Share of Voice</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl font-bold text-white">{competitor.shareOfVoice}%</span>
+                    </div>
                   </div>
                 </div>
-
-                <Button
-                  variant="outline"
-                  className="w-full border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white bg-transparent"
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Details
-                </Button>
               </CardContent>
             </Card>
           ))}
@@ -218,27 +303,36 @@ export default function CompetitorsClient() {
               </Label>
               <Input
                 id="competitor-name"
-                placeholder="Enter competitor brand name"
+                placeholder="e.g., Adidas, Puma, Nike..."
                 value={newCompetitorName}
                 onChange={(e) => setNewCompetitorName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddCompetitor()}
                 className="bg-slate-900 border-slate-600 text-white placeholder:text-slate-500"
               />
             </div>
           </div>
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => setShowAddDialog(false)}
-              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+              className="text-slate-400 hover:text-white"
+              disabled={addingCompetitor}
             >
               Cancel
             </Button>
             <Button
               onClick={handleAddCompetitor}
-              disabled={!newCompetitorName.trim()}
+              disabled={!newCompetitorName.trim() || addingCompetitor}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
-              Add Competitor
+              {addingCompetitor ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add Competitor"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
