@@ -81,12 +81,18 @@ export default function DashboardClient() {
   }, [])
 
   const loadDashboardData = async () => {
+    console.log("[v0] Loading dashboard data...")
     try {
       const response = await fetch("/api/dashboard")
       const result = await response.json()
+      console.log("[v0] Dashboard data loaded:", {
+        hasConfig: result.hasConfig,
+        configId: result.configId,
+        brandName: result.brand?.name,
+      })
       setData(result)
     } catch (error) {
-      console.error("Failed to load dashboard:", error)
+      console.error("[v0] Failed to load dashboard:", error)
       toast({
         title: "Error",
         description: "Failed to load dashboard data",
@@ -98,7 +104,10 @@ export default function DashboardClient() {
   }
 
   const runAnalysis = async () => {
+    console.log("[v0] Run Analysis clicked - configId:", data?.configId)
+
     if (!data?.configId) {
+      console.log("[v0] No configId - showing setup required toast")
       toast({
         title: "Setup Required",
         description: "Please complete the setup wizard first.",
@@ -108,6 +117,7 @@ export default function DashboardClient() {
     }
 
     setIsRunningAnalysis(true)
+    console.log("[v0] Starting analysis request...")
 
     try {
       toast({
@@ -115,18 +125,22 @@ export default function DashboardClient() {
         description: "Analyzing your brand across AI models...",
       })
 
+      console.log("[v0] Calling /api/analysis/run with configId:", data.configId)
       const response = await fetch("/api/analysis/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ configId: data.configId }),
       })
 
+      console.log("[v0] API response status:", response.status)
       const result = await response.json()
+      console.log("[v0] API response:", result)
 
       if (!response.ok) {
         throw new Error(result.error || result.message || "Analysis failed")
       }
 
+      console.log("[v0] Analysis succeeded - brandScore:", result.brandScore, "planSummary:", !!result.planSummary)
       setLatestAnalysis(result)
 
       toast({
@@ -136,6 +150,7 @@ export default function DashboardClient() {
 
       loadDashboardData()
     } catch (error: any) {
+      console.error("[v0] Analysis FAILED:", error)
       toast({
         title: "Analysis Failed",
         description: error.message || "An error occurred",

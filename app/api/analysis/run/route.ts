@@ -7,36 +7,46 @@ export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
+  console.log("[v0] Analysis API called at", new Date().toISOString())
 
   try {
     const supabase = await createServerClient()
+    console.log("[v0] Supabase client created")
+
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
 
+    console.log("[v0] Auth check - user:", user?.id, "error:", authError?.message)
+
     if (authError || !user) {
+      console.log("[v0] UNAUTHORIZED - no user")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await request.json()
     const { configId } = body
+    console.log("[v0] Request body configId:", configId)
 
-    // Fetch tracking config - try specific ID first, then fallback to any config for user
+    // Fetch tracking config
     let config = null
 
     if (configId && configId !== "current") {
-      const { data } = await supabase
+      console.log("[v0] Fetching config by ID:", configId)
+      const { data, error } = await supabase
         .from("tracking_configs")
         .select("*")
         .eq("id", configId)
         .eq("user_id", user.id)
         .single()
       config = data
+      console.log("[v0] Config by ID result:", data ? "found" : "not found", error?.message)
     }
 
     if (!config) {
-      const { data } = await supabase
+      console.log("[v0] Fetching any config for user")
+      const { data, error } = await supabase
         .from("tracking_configs")
         .select("*")
         .eq("user_id", user.id)
@@ -44,9 +54,11 @@ export async function POST(request: NextRequest) {
         .limit(1)
         .single()
       config = data
+      console.log("[v0] Any config result:", data ? "found" : "not found", error?.message)
     }
 
     if (!config) {
+      console.log("[v0] NO CONFIG FOUND - returning 404")
       return NextResponse.json({ error: "No tracking config found. Please complete setup first." }, { status: 404 })
     }
 
@@ -54,12 +66,17 @@ export async function POST(request: NextRequest) {
     const competitors = config.competitors || []
     const industry = config.industry || "general"
 
-    console.log(`[Analysis] Running analysis for ${brandName} with ${competitors.length} competitors`)
+    console.log(
+      `[v0] Starting analysis for brand: ${brandName}, competitors: ${competitors.length}, industry: ${industry}`,
+    )
 
     // Run the simplified analysis
+    console.log("[v0] Calling runSimpleAnalysis...")
     const result = await runSimpleAnalysis(brandName, competitors, industry)
+    console.log("[v0] Analysis complete - brandScore:", result.brandScore, "queriesSucceeded:", result.queriesSucceeded)
 
-    console.log(`[Analysis] Building strategic plan for ${brandName}...`)
+    // Build strategy plan
+    console.log("[v0] Building strategy plan...")
     let strategyPlan = null
     try {
       const trackingConfig = {
@@ -69,13 +86,13 @@ export async function POST(request: NextRequest) {
         userId: user.id,
       }
       strategyPlan = await buildStrategyPlan(result, trackingConfig, undefined)
-      console.log(`[Analysis] Strategy plan built successfully`)
+      console.log("[v0] Strategy plan built - northStarGoal:", strategyPlan?.northStarGoal?.substring(0, 50))
     } catch (strategyError) {
-      console.error(`[Analysis] Strategy plan generation failed (non-fatal):`, strategyError)
-      // Non-fatal - continue without strategy plan
+      console.error("[v0] Strategy plan FAILED:", strategyError)
     }
 
-    // Save to database with columns that match the actual schema
+    // Save to database
+    console.log("[v0] Saving report to database...")
     const reportData = {
       id: result.id,
       user_id: user.id,
@@ -127,8 +144,8 @@ export async function POST(request: NextRequest) {
     const { error: saveError } = await supabase.from("reports").insert(reportData)
 
     if (saveError) {
-      console.error("[Analysis] Error saving report:", saveError)
-      // Try with minimal columns if full insert fails
+      console.error("[v0] Save report FAILED:", saveError.message, saveError.details)
+      // Try minimal save
       const { error: minimalError } = await supabase.from("reports").insert({
         user_id: user.id,
         config_id: config.id,
@@ -137,16 +154,19 @@ export async function POST(request: NextRequest) {
         status: "completed",
         created_at: result.timestamp,
       })
-
       if (minimalError) {
-        console.error("[Analysis] Minimal save also failed:", minimalError)
+        console.error("[v0] Minimal save ALSO FAILED:", minimalError.message)
+      } else {
+        console.log("[v0] Minimal save succeeded")
       }
+    } else {
+      console.log("[v0] Report saved successfully")
     }
 
     // Update last run timestamp
     await supabase.from("tracking_configs").update({ last_run_at: new Date().toISOString() }).eq("id", config.id)
 
-    return NextResponse.json({
+    const response = {
       success: true,
       analysisId: result.id,
       brandScore: result.brandScore,
@@ -155,7 +175,6 @@ export async function POST(request: NextRequest) {
       summary: result.summary,
       processingTime: Date.now() - startTime,
       result,
-      // Strategy plan summary for quick access
       planSummary: strategyPlan
         ? {
             northStarGoal: strategyPlan.northStarGoal,
@@ -163,9 +182,12 @@ export async function POST(request: NextRequest) {
             backlogCount: strategyPlan.backlog?.length || 0,
           }
         : null,
-    })
+    }
+
+    console.log("[v0] Returning success response - brandScore:", response.brandScore)
+    return NextResponse.json(response)
   } catch (error) {
-    console.error("[Analysis] Error:", error)
+    console.error("[v0] FATAL ERROR:", error)
     return NextResponse.json(
       {
         error: "Analysis failed",
