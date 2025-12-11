@@ -35,6 +35,7 @@ export async function POST(request: Request) {
 
     console.log("[v0] User authenticated:", user.id)
 
+    // Check if profile exists
     const { data: existingProfile, error: profileCheckError } = await supabase
       .from("profiles")
       .select("id")
@@ -46,12 +47,9 @@ export async function POST(request: Request) {
       console.log("[v0] Profile not found, creating one for user:", user.id)
       const { error: createProfileError } = await supabase.from("profiles").insert({
         id: user.id,
-        email: user.email,
+        email: user.email || "",
         full_name: user.user_metadata?.name || user.user_metadata?.full_name || "",
-        company: user.user_metadata?.company || "",
         plan: "free",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       })
 
       if (createProfileError) {
