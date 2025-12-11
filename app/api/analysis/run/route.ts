@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase/server"
 import { runSimpleAnalysis } from "@/lib/analysis/simple-engine"
+import { buildStrategyPlan } from "@/lib/analysis/strategy-plan"
 
 export const maxDuration = 60
 
@@ -58,8 +59,23 @@ export async function POST(request: NextRequest) {
     // Run the simplified analysis
     const result = await runSimpleAnalysis(brandName, competitors, industry)
 
+    console.log(`[Analysis] Building strategic plan for ${brandName}...`)
+    let strategyPlan = null
+    try {
+      const trackingConfig = {
+        brand: brandName,
+        competitors,
+        industry,
+        userId: user.id,
+      }
+      strategyPlan = await buildStrategyPlan(result, trackingConfig, undefined)
+      console.log(`[Analysis] Strategy plan built successfully`)
+    } catch (strategyError) {
+      console.error(`[Analysis] Strategy plan generation failed (non-fatal):`, strategyError)
+      // Non-fatal - continue without strategy plan
+    }
+
     // Save to database with columns that match the actual schema
-    // Using a more flexible approach - store full result in a JSONB field
     const reportData = {
       id: result.id,
       user_id: user.id,
@@ -89,6 +105,7 @@ export async function POST(request: NextRequest) {
         opportunities: result.opportunities,
         threats: result.threats,
       },
+      strategy_plan: strategyPlan,
       threats: result.competitorScores.map((c) => ({
         competitor: c.name,
         score: c.score,
@@ -138,6 +155,14 @@ export async function POST(request: NextRequest) {
       summary: result.summary,
       processingTime: Date.now() - startTime,
       result,
+      // Strategy plan summary for quick access
+      strategyPlan: strategyPlan
+        ? {
+            northStarGoal: strategyPlan.northStarGoal,
+            quickWins: strategyPlan.plan90_30_7?.days7 || [],
+            backlogCount: strategyPlan.backlog?.length || 0,
+          }
+        : null,
     })
   } catch (error) {
     console.error("[Analysis] Error:", error)
