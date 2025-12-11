@@ -15,7 +15,7 @@ export async function GET() {
 
     const { data: config, error: configError } = await supabase
       .from("tracking_configs")
-      .select("id, brand, competitors")
+      .select("id, primary_brand, competitors")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -31,29 +31,30 @@ export async function GET() {
 
     const { data: latestReport } = await supabase
       .from("reports")
-      .select("share_of_voice, threats")
-      .eq("tracking_config_id", config.id)
+      .select("data")
+      .eq("config_id", config.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .single()
 
+    const reportData = latestReport?.data as any
+
     const competitors = (config.competitors || []).map((name: string, index: number) => {
-      const shareOfVoice = latestReport?.share_of_voice?.[name] || Math.floor(Math.random() * 15) + 5
-      const threat = latestReport?.threats?.find((t: any) => t.competitor === name)
+      const competitorData = reportData?.competitors?.find((c: any) => c.name === name)
 
       return {
         id: `competitor-${index}`,
         name,
-        score: threat?.score || Math.floor(Math.random() * 30) + 50,
-        scoreChange: threat?.momentum || Math.floor(Math.random() * 10) - 5,
-        shareOfVoice,
-        threatLevel: threat?.level || (shareOfVoice > 20 ? "high" : shareOfVoice > 10 ? "medium" : "low"),
+        score: competitorData?.score || Math.floor(Math.random() * 30) + 50,
+        scoreChange: competitorData?.change || 0,
+        shareOfVoice: competitorData?.shareOfVoice || Math.floor(Math.random() * 15) + 5,
+        threatLevel: competitorData?.threatLevel || "low",
       }
     })
 
     return NextResponse.json({
       competitors,
-      brand: config.brand,
+      brand: config.primary_brand,
       configId: config.id,
     })
   } catch (error) {

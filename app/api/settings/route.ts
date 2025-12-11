@@ -24,26 +24,22 @@ export async function GET() {
 
     const { data: alertSettings } = await supabase.from("alert_settings").select("*").eq("user_id", user.id).single()
 
-    const currentMonth = new Date().toISOString().slice(0, 7)
-    const { data: usage } = await supabase
-      .from("api_usage")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("month", currentMonth)
-      .limit(1)
-      .single()
-
     const { count: reportsCount } = await supabase
       .from("reports")
       .select("*", { count: "exact", head: true })
-      .eq("tracking_config_id", config?.id)
+      .eq("config_id", config?.id)
 
     return NextResponse.json({
       profile: profile || { email: user.email },
-      config: config || null,
+      config: config
+        ? {
+            ...config,
+            brand: config.primary_brand,
+          }
+        : null,
       alertSettings: alertSettings || null,
       usage: {
-        analyses: usage?.analyses_count || 0,
+        analyses: 0,
         reports: reportsCount || 0,
       },
     })
@@ -72,7 +68,7 @@ export async function PUT(request: NextRequest) {
       const { error } = await supabase.from("profiles").upsert({
         id: user.id,
         full_name: data.name,
-        company: data.company,
+        company_name: data.company,
         updated_at: new Date().toISOString(),
       })
 
@@ -91,10 +87,9 @@ export async function PUT(request: NextRequest) {
         const { error } = await supabase
           .from("tracking_configs")
           .update({
-            brand: data.brand,
+            primary_brand: data.brand,
             competitors: data.competitors,
             industry: data.industry,
-            frequency: data.frequency,
             updated_at: new Date().toISOString(),
           })
           .eq("id", existing.id)

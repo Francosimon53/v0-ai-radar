@@ -16,7 +16,7 @@ export async function GET() {
     // Get user's tracking config
     const { data: config } = await supabase
       .from("tracking_configs")
-      .select("id")
+      .select("id, primary_brand")
       .eq("user_id", user.id)
       .limit(1)
       .single()
@@ -38,27 +38,35 @@ export async function GET() {
     }
 
     const transformedReports = (reports || []).map((report: any) => {
+      const narrativeAnalysis = report.narrative_analysis || {}
+      const dimensionalScores = report.dimensional_scores || {}
+      const shareOfVoice = report.share_of_voice || {}
+
       return {
         id: report.id,
         date: report.created_at,
         created_at: report.created_at,
-        brand: report.brand || "Unknown",
-        score: report.score || 0,
-        shareOfVoice: report.share_of_voice || 0,
-        sentiment: report.sentiment || "neutral",
-        strengths: report.strengths || [],
-        weaknesses: report.weaknesses || [],
-        opportunities: report.opportunities || [],
-        threats: report.threats || [],
-        summary: report.executive_summary || "",
-        modelBreakdown: report.model_breakdown || [],
-        competitorScores: report.competitor_scores || [],
-        fullResult: report.full_result,
-        status: "ready",
+        brand: report.brand_name || config.primary_brand || "Unknown",
+        score: report.overall_score || 0,
+        previousScore: report.previous_score,
+        scoreChange: report.score_change,
+        shareOfVoice: typeof shareOfVoice === "object" ? shareOfVoice.brand || 0 : shareOfVoice,
+        sentiment: dimensionalScores.sentiment || "neutral",
+        strengths: narrativeAnalysis.strengths || [],
+        weaknesses: narrativeAnalysis.weaknesses || [],
+        opportunities: narrativeAnalysis.opportunities || [],
+        threats: narrativeAnalysis.threats || [],
+        summary: narrativeAnalysis.summary || "",
+        modelBreakdown: dimensionalScores.modelBreakdown || [],
+        competitorScores: report.threats || [],
+        recommendations: report.recommendations || [],
+        modelsQueried: report.models_queried || [],
+        processingTime: report.processing_time_ms,
+        status: report.status || "completed",
       }
     })
 
-    const brands = [...new Set(transformedReports.map((r: any) => r.brand))]
+    const brands = [...new Set(transformedReports.map((r: any) => r.brand).filter(Boolean))]
 
     return NextResponse.json({
       reports: transformedReports,

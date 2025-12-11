@@ -13,7 +13,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get tracking config - using correct column names
+    // Get tracking config
     const { data: config, error: configError } = await supabase
       .from("tracking_configs")
       .select("*")
@@ -47,7 +47,7 @@ export async function GET() {
     const brandName = config.primary_brand || config.name || "Unknown"
     const competitors = config.competitors || []
 
-    // Get latest report - using config_id not tracking_config_id
+    // Get latest report
     const { data: latestReport } = await supabase
       .from("reports")
       .select("*")
@@ -67,7 +67,7 @@ export async function GET() {
     // Get analysis history from reports table
     const { data: analysisHistory } = await supabase
       .from("reports")
-      .select("id, created_at, score, share_of_voice, sentiment, competitor_scores")
+      .select("id, created_at, overall_score, share_of_voice, dimensional_scores, threats")
       .eq("config_id", config.id)
       .order("created_at", { ascending: true })
       .limit(30)
@@ -90,24 +90,37 @@ export async function GET() {
       .eq("config_id", config.id)
       .gte("created_at", startOfMonth.toISOString())
 
+    // Extract data from latest report
+    const currentScore = latestReport?.overall_score || 0
+    const shareOfVoiceData = latestReport?.share_of_voice || {}
+    const shareOfVoice = typeof shareOfVoiceData === "object" ? shareOfVoiceData.brand || 0 : shareOfVoiceData
+    const dimensionalScores = latestReport?.dimensional_scores || {}
+    const sentiment = dimensionalScores.sentiment || "neutral"
+
     // Calculate previous score for trend
     const previousReport =
       analysisHistory && analysisHistory.length > 1 ? analysisHistory[analysisHistory.length - 2] : null
-    const previousScore = previousReport?.score || null
+    const previousScore = previousReport?.overall_score || null
 
-    // Current score from latest report
-    const currentScore = latestReport?.score || 0
-    const shareOfVoice = latestReport?.share_of_voice || 0
-
-    // Calculate competitor gap
-    const competitorScores = latestReport?.competitor_scores || []
-    const topCompetitorScore =
-      competitorScores.length > 0 ? Math.max(...competitorScores.map((c: any) => c.score || 0)) : 0
+    // Calculate competitor gap from threats data
+    const threatData = latestReport?.threats || []
+    const topCompetitorScore = threatData.length > 0 ? Math.max(...threatData.map((t: any) => t.score || 0)) : 0
     const competitorGap = currentScore - topCompetitorScore
 
     // Calculate rank
-    const allScores = [currentScore, ...competitorScores.map((c: any) => c.score || 0)].sort((a, b) => b - a)
+    const allScores = [currentScore, ...threatData.map((t: any) => t.score || 0)].sort((a, b) => b - a)
     const rank = allScores.indexOf(currentScore) + 1
+
+    // Transform analysis history for charts
+    const transformedHistory = (analysisHistory || []).map((report: any) => ({
+      id: report.id,
+      created_at: report.created_at,
+      score: report.overall_score || 0,
+      share_of_voice:
+        typeof report.share_of_voice === "object" ? report.share_of_voice.brand || 0 : report.share_of_voice,
+      sentiment: report.dimensional_scores?.sentiment || "neutral",
+      competitor_scores: report.threats || [],
+    }))
 
     return NextResponse.json({
       hasConfig: true,
@@ -120,13 +133,19 @@ export async function GET() {
         totalCompetitors: competitors.length + 1,
         shareOfVoice,
         competitorGap,
-        sentiment: latestReport?.sentiment || "neutral",
+        sentiment,
         nextAnalysis: 0,
         lastUpdated: latestReport?.created_at ? formatTimeAgo(new Date(latestReport.created_at)) : "Never",
       },
-      latestReport,
+      latestReport: latestReport
+        ? {
+            ...latestReport,
+            score: latestReport.overall_score,
+            brand: latestReport.brand_name,
+          }
+        : null,
       recentAlerts: recentAlerts || [],
-      analysisHistory: analysisHistory || [],
+      analysisHistory: transformedHistory,
       competitors,
       configId: config.id,
       metrics: {
