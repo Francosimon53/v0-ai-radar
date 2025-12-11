@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
       strategyPlan: strategyPlan
         ? {
             northStarGoal: strategyPlan.northStarGoal,
-            quickWins: strategyPlan.plan90_30_7?.days7 || [],
+            quickWins: strategyPlan.plan90_30_7?.quickWins || [],
             backlogCount: strategyPlan.backlog?.length || 0,
           }
         : null,
