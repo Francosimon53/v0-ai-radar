@@ -59,6 +59,9 @@ export default function SignupPage() {
 
     try {
       const supabase = createClient()
+
+      console.log("[v0] Attempting signup with email:", formData.email)
+
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -72,19 +75,25 @@ export default function SignupPage() {
         },
       })
 
+      console.log("[v0] Signup response:", { data, error })
+
       if (error) {
+        console.log("[v0] Signup error:", error.message, error.status)
         setAuthError(error.message)
         setIsLoading(false)
         return
       }
 
-      if (data.session) {
+      if (data.user && !data.session) {
+        setAuthError("Check your email to confirm your account before signing in.")
+      } else if (data.session) {
         router.push("/dashboard/setup")
       } else {
-        setAuthError("Check your email to confirm your account before signing in.")
+        setAuthError("Signup completed. Please check your email to confirm your account.")
       }
-    } catch (err) {
-      setAuthError("An unexpected error occurred. Please try again.")
+    } catch (err: any) {
+      console.log("[v0] Caught error:", err)
+      setAuthError(err?.message || "An unexpected error occurred. Please try again.")
     } finally {
       setIsLoading(false)
     }
