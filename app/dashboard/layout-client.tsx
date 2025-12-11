@@ -19,11 +19,9 @@ import {
   CreditCard,
   LogOut,
   Radar,
-  Search,
   Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -52,9 +50,9 @@ interface PlanData {
 }
 
 const planLimits: Record<string, { competitors: number; analyses: number }> = {
-  free: { competitors: 5, analyses: 1 },
-  starter: { competitors: 10, analyses: 4 },
-  pro: { competitors: 25, analyses: 30 },
+  free: { competitors: 5, analyses: 3 },
+  starter: { competitors: 10, analyses: 10 },
+  pro: { competitors: 25, analyses: 50 },
   enterprise: { competitors: 100, analyses: 999 },
 }
 
@@ -79,13 +77,13 @@ const pageInfo: Record<string, { title: string; description: string }> = {
     title: "Settings",
     description: "Manage your account and preferences",
   },
+  "/dashboard/setup": {
+    title: "Setup",
+    description: "Configure your brand tracking",
+  },
 }
 
-export default function DashboardLayoutClient({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function DashboardLayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const { toast } = useToast()
@@ -104,170 +102,132 @@ export default function DashboardLayoutClient({
     competitorsUsed: 0,
     competitorsLimit: 5,
     analysesUsed: 0,
-    analysesLimit: 1,
+    analysesLimit: 3,
   })
   const [unreadAlerts, setUnreadAlerts] = useState(0)
   const [configId, setConfigId] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
 
   const currentPage = pageInfo[pathname] || pageInfo["/dashboard"]
 
   useEffect(() => {
     setMounted(true)
+    loadSidebarData()
   }, [])
 
-  useEffect(() => {
-    async function loadSidebarData() {
-      try {
-        const supabase = createBrowserClient()
+  async function loadSidebarData() {
+    try {
+      const supabase = createBrowserClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-        console.log("[v0] Loading sidebar data...")
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-        // Get current user
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
+        if (profile) {
+          const plan = profile.plan || "free"
+          const limits = planLimits[plan] || planLimits.free
 
-        console.log("[v0] User:", user?.id || "not authenticated")
+          setUserData({
+            name: profile.full_name || user.email?.split("@")[0] || "User",
+            email: user.email || "",
+            avatar: profile.avatar_url,
+          })
 
-        if (user) {
-          // Get profile
-          const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+          const { data: config } = await supabase
+            .from("tracking_configs")
+            .select("id, competitors")
+            .eq("user_id", user.id)
+            .single()
 
-          console.log("[v0] Profile:", profile?.id || "not found")
-
-          if (profile) {
-            const plan = profile.plan || "free"
-            const limits = planLimits[plan] || planLimits.free
-
-            setUserData({
-              name: profile.full_name || user.email?.split("@")[0] || "User",
-              email: user.email || "",
-              avatar: profile.avatar_url,
-            })
-
-            // Get tracking config for competitors count
-            const { data: config } = await supabase
-              .from("tracking_configs")
-              .select("id, competitors")
-              .eq("user_id", user.id)
-              .single()
-
-            console.log("[v0] Config found:", config?.id || "not found")
-
-            const competitorsUsed = config?.competitors?.length || 0
-            if (config) {
-              setConfigId(config.id)
-            }
-
-            // Get current month usage
-            const currentMonth = new Date().toISOString().slice(0, 7)
-            const { data: usage } = await supabase
-              .from("api_usage")
-              .select("analyses_count")
-              .eq("user_id", user.id)
-              .eq("month", currentMonth)
-              .single()
-
-            setPlanData({
-              name: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`,
-              competitorsUsed,
-              competitorsLimit: limits.competitors,
-              analysesUsed: usage?.analyses_count || 0,
-              analysesLimit: limits.analyses,
-            })
+          const competitorsUsed = config?.competitors?.length || 0
+          if (config) {
+            setConfigId(config.id)
           }
 
-          // Get unread alerts count
-          const { count } = await supabase
-            .from("alerts")
+          // Get reports count this month
+          const startOfMonth = new Date()
+          startOfMonth.setDate(1)
+          startOfMonth.setHours(0, 0, 0, 0)
+
+          const { count: reportsCount } = await supabase
+            .from("reports")
             .select("*", { count: "exact", head: true })
             .eq("user_id", user.id)
-            .eq("is_read", false)
+            .gte("created_at", startOfMonth.toISOString())
 
-          setUnreadAlerts(count || 0)
+          setPlanData({
+            name: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`,
+            competitorsUsed,
+            competitorsLimit: limits.competitors,
+            analysesUsed: reportsCount || 0,
+            analysesLimit: limits.analyses,
+          })
         }
-      } catch (error) {
-        console.error("[v0] Error loading sidebar data:", error)
-      } finally {
-        setIsLoading(false)
-        console.log("[v0] Sidebar data loaded, isLoading = false")
-      }
-    }
 
-    loadSidebarData()
-  }, [pathname]) // Refetch when navigating
+        const { count } = await supabase
+          .from("alerts")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("is_read", false)
+
+        setUnreadAlerts(count || 0)
+      }
+    } catch (error) {
+      console.error("Error loading sidebar data:", error)
+    }
+  }
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark")
   }
 
   const runAnalysis = async () => {
-    console.log("[v0] ====== Run Analysis Button Clicked ======")
-    console.log("[v0] isRunningAnalysis:", isRunningAnalysis)
-    console.log("[v0] configId:", configId)
-    console.log("[v0] isLoading:", isLoading)
-
-    // Prevent double-clicks
-    if (isRunningAnalysis) {
-      console.log("[v0] Already running, ignoring click")
-      return
-    }
+    if (isRunningAnalysis) return
 
     if (!configId) {
-      console.log("[v0] No configId found, showing toast and redirecting to setup")
       toast({
         title: "Setup Required",
-        description: "Please complete the setup wizard first to configure your brand tracking.",
+        description: "Please complete the setup wizard first.",
         variant: "destructive",
       })
       router.push("/dashboard/setup")
       return
     }
 
-    console.log("[v0] Setting isRunningAnalysis to true")
     setIsRunningAnalysis(true)
 
     try {
-      console.log("[v0] Showing 'Analysis Started' toast")
       toast({
         title: "Analysis Started",
-        description: "Your brand analysis is running. This may take a few minutes.",
+        description: "Analyzing your brand across AI models...",
       })
 
-      console.log("[v0] Calling /api/analysis/run with configId:", configId)
       const response = await fetch("/api/analysis/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ configId }),
       })
 
-      console.log("[v0] Response status:", response.status)
-
       const result = await response.json()
-      console.log("[v0] Response result:", result)
 
       if (!response.ok) {
         throw new Error(result.error || result.message || "Analysis failed")
       }
 
-      console.log("[v0] Analysis completed successfully")
       toast({
         title: "Analysis Complete",
-        description: "Your brand report is ready to view.",
+        description: `Brand score: ${result.brandScore}/100`,
       })
 
-      // Refresh the page to show new data
       router.refresh()
     } catch (error) {
-      console.error("[v0] Analysis error:", error)
       toast({
         title: "Analysis Failed",
-        description: error instanceof Error ? error.message : "An error occurred. Please try again.",
+        description: error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       })
     } finally {
-      console.log("[v0] Setting isRunningAnalysis to false")
       setIsRunningAnalysis(false)
     }
   }
@@ -288,15 +248,15 @@ export default function DashboardLayoutClient({
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
-      {/* Logo Section */}
-      <div className="flex items-center gap-3 border-b border-slate-700 px-6 py-5">
+      {/* Logo */}
+      <div className="flex items-center gap-3 border-b border-sidebar-border px-6 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
           <Radar className="h-5 w-5 text-primary-foreground" />
         </div>
-        <span className="text-lg font-semibold text-white">AI Vibes Radar</span>
+        <span className="text-lg font-semibold">AI Radar</span>
       </div>
 
-      {/* Navigation Menu */}
+      {/* Nav */}
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
           const isActive = pathname === item.href
@@ -306,7 +266,9 @@ export default function DashboardLayoutClient({
               href={item.href}
               onClick={() => setSidebarOpen(false)}
               className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                isActive ? "bg-primary text-primary-foreground" : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                isActive
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
               }`}
             >
               <div className="flex items-center gap-3">
@@ -314,7 +276,7 @@ export default function DashboardLayoutClient({
                 {item.name}
               </div>
               {item.badge && item.badge > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-medium text-white">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-medium text-destructive-foreground">
                   {item.badge}
                 </span>
               )}
@@ -323,44 +285,41 @@ export default function DashboardLayoutClient({
         })}
       </nav>
 
-      {/* Plan Status Card */}
-      <div className="mx-3 mb-4 rounded-lg bg-slate-800 p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-white">{planData.name}</span>
+      {/* Plan Status */}
+      <div className="mx-3 mb-4 rounded-lg bg-sidebar-accent p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-sm font-medium">{planData.name}</span>
           <Link href="/dashboard/settings" className="text-xs text-primary hover:underline">
             Upgrade
           </Link>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div>
-            <div className="mb-1 flex justify-between text-xs text-slate-400">
+            <div className="mb-1 flex justify-between text-xs text-muted-foreground">
               <span>Competitors</span>
               <span>
                 {planData.competitorsUsed}/{planData.competitorsLimit}
               </span>
             </div>
-            <Progress
-              value={(planData.competitorsUsed / planData.competitorsLimit) * 100}
-              className="h-1.5 bg-slate-700"
-            />
+            <Progress value={(planData.competitorsUsed / planData.competitorsLimit) * 100} className="h-1.5" />
           </div>
           <div>
-            <div className="mb-1 flex justify-between text-xs text-slate-400">
-              <span>Analyses this month</span>
+            <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+              <span>Analyses</span>
               <span>
                 {planData.analysesUsed}/{planData.analysesLimit}
               </span>
             </div>
-            <Progress value={(planData.analysesUsed / planData.analysesLimit) * 100} className="h-1.5 bg-slate-700" />
+            <Progress value={(planData.analysesUsed / planData.analysesLimit) * 100} className="h-1.5" />
           </div>
         </div>
       </div>
 
-      {/* User Profile Section */}
-      <div className="border-t border-slate-700 p-3">
+      {/* User Profile */}
+      <div className="border-t border-sidebar-border p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-slate-800">
+            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-sidebar-accent">
               <Avatar className="h-9 w-9">
                 <AvatarImage src={userData.avatar || undefined} />
                 <AvatarFallback className="bg-primary text-primary-foreground">
@@ -368,10 +327,10 @@ export default function DashboardLayoutClient({
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 truncate">
-                <p className="text-sm font-medium text-white">{userData.name}</p>
-                <p className="truncate text-xs text-slate-400">{userData.email}</p>
+                <p className="text-sm font-medium">{userData.name}</p>
+                <p className="truncate text-xs text-muted-foreground">{userData.email}</p>
               </div>
-              <ChevronUp className="h-4 w-4 text-slate-400" />
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -388,7 +347,7 @@ export default function DashboardLayoutClient({
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-red-500">
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive">
               <LogOut className="mr-2 h-4 w-4" />
               Log out
             </DropdownMenuItem>
@@ -401,18 +360,18 @@ export default function DashboardLayoutClient({
   return (
     <div className="flex h-screen bg-background">
       {/* Desktop Sidebar */}
-      <aside className="hidden w-64 flex-shrink-0 bg-slate-900 lg:block">
+      <aside className="hidden w-64 flex-shrink-0 border-r border-sidebar-border bg-sidebar lg:block">
         <SidebarContent />
       </aside>
 
       {/* Mobile Sidebar */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-64 bg-slate-900 p-0">
+        <SheetContent side="left" className="w-64 bg-sidebar p-0">
           <SidebarContent />
         </SheetContent>
       </Sheet>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
         <header className="flex h-16 items-center justify-between border-b bg-card px-4 lg:px-6">
@@ -427,11 +386,6 @@ export default function DashboardLayoutClient({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="relative hidden md:block">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Search..." className="w-64 pl-9" />
-            </div>
-
             <Button onClick={runAnalysis} disabled={isRunningAnalysis} className="gap-2">
               {isRunningAnalysis ? (
                 <>
@@ -450,7 +404,7 @@ export default function DashboardLayoutClient({
               <Link href="/dashboard/alerts">
                 <Bell className="h-5 w-5" />
                 {unreadAlerts > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-medium text-white">
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-xs font-medium text-destructive-foreground">
                     {unreadAlerts}
                   </span>
                 )}
@@ -466,7 +420,7 @@ export default function DashboardLayoutClient({
         {/* Page Content */}
         <main className="flex-1 overflow-auto p-4 lg:p-6">{children}</main>
 
-        {/* Mobile Bottom Navigation */}
+        {/* Mobile Nav */}
         <nav className="flex border-t bg-card lg:hidden">
           {navItems.slice(0, 5).map((item) => {
             const isActive = pathname === item.href
@@ -481,7 +435,7 @@ export default function DashboardLayoutClient({
                 <item.icon className="h-5 w-5" />
                 <span>{item.name}</span>
                 {item.badge && item.badge > 0 && (
-                  <span className="absolute right-1/4 top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-medium text-white">
+                  <span className="absolute right-1/4 top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-xs font-medium text-destructive-foreground">
                     {item.badge}
                   </span>
                 )}

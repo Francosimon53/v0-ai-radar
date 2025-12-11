@@ -1,22 +1,39 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { FileText, Download, Calendar, TrendingUp, TrendingDown, Loader2, Play, ExternalLink } from "lucide-react"
+import {
+  FileText,
+  Calendar,
+  TrendingUp,
+  TrendingDown,
+  Loader2,
+  Sparkles,
+  ChevronRight,
+  Zap,
+  Target,
+  AlertTriangle,
+  CheckCircle2,
+} from "lucide-react"
 import Link from "next/link"
 
 interface Report {
   id: string
   brand: string
   score: number
-  previous_score: number | null
-  share_of_voice: number
+  shareOfVoice: number
+  sentiment: string
   created_at: string
-  pdf_url: string | null
-  executive_summary: string
+  strengths: string[]
+  weaknesses: string[]
+  opportunities: string[]
+  threats: string[]
+  summary: string
+  modelBreakdown: { model: string; score: number; sentiment: string }[]
+  competitorScores: { name: string; score: number; shareOfVoice: number }[]
 }
 
 export default function ReportsClient() {
@@ -25,6 +42,7 @@ export default function ReportsClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [configId, setConfigId] = useState<string | null>(null)
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null)
 
   useEffect(() => {
     loadReports()
@@ -37,6 +55,9 @@ export default function ReportsClient() {
         const data = await response.json()
         setReports(data.reports || [])
         setConfigId(data.configId || null)
+        if (data.reports?.length > 0) {
+          setSelectedReport(data.reports[0])
+        }
       }
     } catch (error) {
       console.error("Failed to load reports:", error)
@@ -57,6 +78,11 @@ export default function ReportsClient() {
 
     setIsGenerating(true)
     try {
+      toast({
+        title: "Analysis Started",
+        description: "Analyzing your brand across AI models...",
+      })
+
       const response = await fetch("/api/analysis/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -68,7 +94,7 @@ export default function ReportsClient() {
       if (response.ok) {
         toast({
           title: "Report Generated",
-          description: "Your new report is ready to view",
+          description: `Brand score: ${result.brandScore}/100`,
         })
         loadReports()
       } else {
@@ -77,7 +103,7 @@ export default function ReportsClient() {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to generate report. Please try again.",
+        description: error.message || "Failed to generate report",
         variant: "destructive",
       })
     } finally {
@@ -87,8 +113,11 @@ export default function ReportsClient() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading reports...</p>
+        </div>
       </div>
     )
   }
@@ -98,38 +127,34 @@ export default function ReportsClient() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Reports</h1>
-          <p className="text-muted-foreground">View and download your brand intelligence reports</p>
+          <p className="text-muted-foreground">View and analyze your brand intelligence reports</p>
         </div>
 
-        <Card className="border-border bg-card">
+        <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <FileText className="h-8 w-8 text-muted-foreground" />
+            <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+              <FileText className="h-8 w-8 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">No Reports Yet</h3>
-            <p className="text-muted-foreground text-center mb-6 max-w-md">
-              Run your first analysis to generate a brand intelligence report with AI-powered insights.
+            <h3 className="text-xl font-semibold mb-2">No Reports Yet</h3>
+            <p className="text-muted-foreground text-center mb-8 max-w-md">
+              Run your first analysis to generate a comprehensive brand intelligence report with AI-powered insights.
             </p>
-            <Button
-              onClick={handleGenerateReport}
-              disabled={isGenerating || !configId}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
+            <Button onClick={handleGenerateReport} disabled={isGenerating || !configId} size="lg">
               {isGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
+                  Generating Report...
                 </>
               ) : (
                 <>
-                  <Play className="mr-2 h-4 w-4" />
+                  <Sparkles className="mr-2 h-4 w-4" />
                   Generate First Report
                 </>
               )}
             </Button>
             {!configId && (
               <p className="text-sm text-muted-foreground mt-4">
-                <Link href="/dashboard/setup" className="text-blue-500 hover:underline">
+                <Link href="/dashboard/setup" className="text-primary hover:underline">
                   Complete setup
                 </Link>{" "}
                 to generate reports
@@ -143,16 +168,13 @@ export default function ReportsClient() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Reports</h1>
-          <p className="text-muted-foreground">View and download your brand intelligence reports</p>
+          <p className="text-muted-foreground">View and analyze your brand intelligence reports</p>
         </div>
-        <Button
-          onClick={handleGenerateReport}
-          disabled={isGenerating || !configId}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
+        <Button onClick={handleGenerateReport} disabled={isGenerating}>
           {isGenerating ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -160,78 +182,220 @@ export default function ReportsClient() {
             </>
           ) : (
             <>
-              <Play className="mr-2 h-4 w-4" />
+              <Sparkles className="mr-2 h-4 w-4" />
               New Report
             </>
           )}
         </Button>
       </div>
 
-      <div className="grid gap-4">
-        {reports.map((report) => {
-          const scoreChange = report.previous_score ? report.score - report.previous_score : 0
-          const date = new Date(report.created_at)
-
-          return (
-            <Card key={report.id} className="border-border bg-card hover:border-blue-500/50 transition-colors">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-foreground">{report.brand} Analysis Report</h3>
-                      <Badge variant="outline" className="text-blue-400 border-blue-400/50">
-                        Score: {report.score}
-                      </Badge>
-                      {scoreChange !== 0 && (
-                        <span
-                          className={`flex items-center gap-1 text-sm ${scoreChange > 0 ? "text-green-400" : "text-red-400"}`}
-                        >
-                          {scoreChange > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                          {scoreChange > 0 ? "+" : ""}
-                          {scoreChange}
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{report.executive_summary}</p>
-
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {date.toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                      <span>Share of Voice: {report.share_of_voice.toFixed(1)}%</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {report.pdf_url && (
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={report.pdf_url} target="_blank" rel="noopener noreferrer">
-                          <Download className="h-4 w-4 mr-2" />
-                          PDF
-                        </a>
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/dashboard/reports/${report.id}`}>
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        View
-                      </Link>
-                    </Button>
-                  </div>
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Report List */}
+        <div className="space-y-3">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">All Reports</h2>
+          {reports.map((report) => (
+            <Card
+              key={report.id}
+              className={`cursor-pointer transition-all ${
+                selectedReport?.id === report.id ? "border-primary bg-primary/5" : "hover:border-primary/50"
+              }`}
+              onClick={() => setSelectedReport(report)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold">{report.brand}</span>
+                  <Badge variant={report.score >= 70 ? "default" : report.score >= 50 ? "secondary" : "destructive"}>
+                    {report.score}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-3.5 w-3.5" />
+                  {new Date(report.created_at).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </div>
               </CardContent>
             </Card>
-          )
-        })}
+          ))}
+        </div>
+
+        {/* Report Detail */}
+        {selectedReport && (
+          <div className="lg:col-span-2 space-y-6">
+            {/* Score Overview */}
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold">{selectedReport.brand}</h2>
+                    <p className="text-muted-foreground">
+                      Generated{" "}
+                      {new Date(selectedReport.created_at).toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-4xl font-bold">{selectedReport.score}</div>
+                    <div className="text-sm text-muted-foreground">Brand Score</div>
+                  </div>
+                </div>
+
+                {/* Key Metrics */}
+                <div className="grid grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">{selectedReport.shareOfVoice}%</div>
+                    <div className="text-xs text-muted-foreground">Share of Voice</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold capitalize">{selectedReport.sentiment}</div>
+                    <div className="text-xs text-muted-foreground">Sentiment</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">{selectedReport.modelBreakdown?.length || 2}</div>
+                    <div className="text-xs text-muted-foreground">AI Models</div>
+                  </div>
+                </div>
+
+                {/* Summary */}
+                {selectedReport.summary && (
+                  <div className="mt-6">
+                    <h3 className="font-semibold mb-2">Executive Summary</h3>
+                    <p className="text-muted-foreground">{selectedReport.summary}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* SWOT Analysis */}
+            <div className="grid grid-cols-2 gap-4">
+              <SWOTCard
+                title="Strengths"
+                items={selectedReport.strengths}
+                icon={CheckCircle2}
+                color="text-green-500"
+                bgColor="bg-green-500/10"
+              />
+              <SWOTCard
+                title="Weaknesses"
+                items={selectedReport.weaknesses}
+                icon={AlertTriangle}
+                color="text-orange-500"
+                bgColor="bg-orange-500/10"
+              />
+              <SWOTCard
+                title="Opportunities"
+                items={selectedReport.opportunities}
+                icon={Target}
+                color="text-blue-500"
+                bgColor="bg-blue-500/10"
+              />
+              <SWOTCard
+                title="Threats"
+                items={selectedReport.threats}
+                icon={Zap}
+                color="text-red-500"
+                bgColor="bg-red-500/10"
+              />
+            </div>
+
+            {/* Model Breakdown */}
+            {selectedReport.modelBreakdown && selectedReport.modelBreakdown.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">AI Model Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {selectedReport.modelBreakdown.map((model, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div>
+                          <p className="font-medium">{model.model}</p>
+                          <p className="text-sm text-muted-foreground capitalize">{model.sentiment} sentiment</p>
+                        </div>
+                        <div className="text-2xl font-bold">{model.score}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Competitor Scores */}
+            {selectedReport.competitorScores && selectedReport.competitorScores.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Competitor Comparison</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {selectedReport.competitorScores.map((comp, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div>
+                          <p className="font-medium">{comp.name}</p>
+                          <p className="text-sm text-muted-foreground">{comp.shareOfVoice}% share of voice</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-2xl font-bold">{comp.score}</div>
+                          {comp.score < selectedReport.score ? (
+                            <TrendingDown className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <TrendingUp className="h-4 w-4 text-red-500" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </div>
     </div>
+  )
+}
+
+function SWOTCard({
+  title,
+  items,
+  icon: Icon,
+  color,
+  bgColor,
+}: {
+  title: string
+  items: string[]
+  icon: any
+  color: string
+  bgColor: string
+}) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className={`h-8 w-8 rounded-lg ${bgColor} flex items-center justify-center`}>
+            <Icon className={`h-4 w-4 ${color}`} />
+          </div>
+          <h3 className="font-semibold">{title}</h3>
+        </div>
+        {items && items.length > 0 ? (
+          <ul className="space-y-2">
+            {items.map((item, idx) => (
+              <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                <ChevronRight className="h-3 w-3 mt-1 flex-shrink-0" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">No data available</p>
+        )}
+      </CardContent>
+    </Card>
   )
 }

@@ -1,17 +1,19 @@
-import { createUserClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    const supabase = await createUserClient()
+    const supabase = await createServerClient()
 
     const {
       data: { user },
     } = await supabase.auth.getUser()
+
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // Get tracking config - using correct column names
     const { data: config, error: configError } = await supabase
       .from("tracking_configs")
       .select("*")
@@ -31,6 +33,8 @@ export async function GET() {
         latestReport: null,
         recentAlerts: [],
         analysisHistory: [],
+        competitors: [],
+        configId: null,
         metrics: {
           questionsTracked: 0,
           competitorsCount: 0,
@@ -40,11 +44,14 @@ export async function GET() {
       })
     }
 
-    // Get latest report for this brand
+    const brandName = config.primary_brand || config.name || "Unknown"
+    const competitors = config.competitors || []
+
+    // Get latest report - using config_id not tracking_config_id
     const { data: latestReport } = await supabase
       .from("reports")
       .select("*")
-      .eq("tracking_config_id", config.id)
+      .eq("config_id", config.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .single()
@@ -53,15 +60,15 @@ export async function GET() {
     const { data: recentAlerts } = await supabase
       .from("alerts")
       .select("*")
-      .eq("tracking_config_id", config.id)
+      .eq("config_id", config.id)
       .order("created_at", { ascending: false })
       .limit(5)
 
-    // Get analysis history for trend chart
+    // Get analysis history from reports table
     const { data: analysisHistory } = await supabase
-      .from("analysis_results")
-      .select("*")
-      .eq("tracking_config_id", config.id)
+      .from("reports")
+      .select("id, created_at, score, share_of_voice, sentiment, competitor_scores")
+      .eq("config_id", config.id)
       .order("created_at", { ascending: true })
       .limit(30)
 
@@ -69,7 +76,7 @@ export async function GET() {
     const { count: activeAlertsCount } = await supabase
       .from("alerts")
       .select("*", { count: "exact", head: true })
-      .eq("tracking_config_id", config.id)
+      .eq("config_id", config.id)
       .eq("is_read", false)
 
     // Get analyses count this month
@@ -80,49 +87,50 @@ export async function GET() {
     const { count: analysesThisMonth } = await supabase
       .from("reports")
       .select("*", { count: "exact", head: true })
-      .eq("tracking_config_id", config.id)
+      .eq("config_id", config.id)
       .gte("created_at", startOfMonth.toISOString())
 
-    // Calculate metrics
-    const competitors = config.competitors || []
-    const previousScore =
-      analysisHistory && analysisHistory.length > 1 ? analysisHistory[analysisHistory.length - 2]?.score : null
+    // Calculate previous score for trend
+    const previousReport =
+      analysisHistory && analysisHistory.length > 1 ? analysisHistory[analysisHistory.length - 2] : null
+    const previousScore = previousReport?.score || null
 
-    // Calculate next analysis time
-    const lastAnalysis = latestReport?.created_at ? new Date(latestReport.created_at) : null
-    const frequencyHours =
-      {
-        daily: 24,
-        weekly: 168,
-        monthly: 720,
-      }[config.frequency as string] || 24
+    // Current score from latest report
+    const currentScore = latestReport?.score || 0
+    const shareOfVoice = latestReport?.share_of_voice || 0
 
-    const nextAnalysisTime = lastAnalysis ? new Date(lastAnalysis.getTime() + frequencyHours * 60 * 60 * 1000) : null
-    const hoursUntilNext = nextAnalysisTime
-      ? Math.max(0, Math.round((nextAnalysisTime.getTime() - Date.now()) / (1000 * 60 * 60)))
-      : 0
+    // Calculate competitor gap
+    const competitorScores = latestReport?.competitor_scores || []
+    const topCompetitorScore =
+      competitorScores.length > 0 ? Math.max(...competitorScores.map((c: any) => c.score || 0)) : 0
+    const competitorGap = currentScore - topCompetitorScore
+
+    // Calculate rank
+    const allScores = [currentScore, ...competitorScores.map((c: any) => c.score || 0)].sort((a, b) => b - a)
+    const rank = allScores.indexOf(currentScore) + 1
 
     return NextResponse.json({
       hasConfig: true,
       brand: {
-        name: config.brand,
-        score: latestReport?.overall_score || 0,
-        previousScore: previousScore,
-        trend: latestReport?.overall_score && previousScore ? latestReport.overall_score - previousScore : 0,
-        rank: latestReport?.rank || 1,
+        name: brandName,
+        score: currentScore,
+        previousScore,
+        trend: previousScore ? currentScore - previousScore : 0,
+        rank,
         totalCompetitors: competitors.length + 1,
-        shareOfVoice: latestReport?.share_of_voice || 0,
-        competitorGap: latestReport?.competitor_gap || 0,
-        nextAnalysis: hoursUntilNext,
+        shareOfVoice,
+        competitorGap,
+        sentiment: latestReport?.sentiment || "neutral",
+        nextAnalysis: 0,
         lastUpdated: latestReport?.created_at ? formatTimeAgo(new Date(latestReport.created_at)) : "Never",
       },
       latestReport,
       recentAlerts: recentAlerts || [],
       analysisHistory: analysisHistory || [],
-      competitors: competitors,
+      competitors,
       configId: config.id,
       metrics: {
-        questionsTracked: 100, // Fixed - we use 100 prompts
+        questionsTracked: 10,
         competitorsCount: competitors.length,
         analysesRun: analysesThisMonth || 0,
         activeAlerts: activeAlertsCount || 0,
