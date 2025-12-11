@@ -6,27 +6,42 @@ export async function GET(request: Request) {
     const supabase = await createUserClient()
     const { searchParams } = new URL(request.url)
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const type = searchParams.get("type")
     const read = searchParams.get("read")
 
-    // Get user's tracking config first
-    const { data: config } = await supabase.from("tracking_configs").select("id").limit(1).single()
+    const { data: config } = await supabase
+      .from("tracking_configs")
+      .select("id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .single()
 
     if (!config) {
       return NextResponse.json({ alerts: [], unreadCount: 0 })
     }
 
-    // Build query
-    let query = supabase.from("alerts").select("*").eq("config_id", config.id).order("created_at", { ascending: false })
+    let query = supabase
+      .from("alerts")
+      .select("*")
+      .eq("tracking_config_id", config.id)
+      .order("created_at", { ascending: false })
 
     if (type && type !== "all") {
       query = query.eq("type", type)
     }
 
     if (read === "unread") {
-      query = query.eq("read", false)
+      query = query.eq("is_read", false)
     } else if (read === "read") {
-      query = query.eq("read", true)
+      query = query.eq("is_read", true)
     }
 
     const { data: alerts, error } = await query.limit(50)
@@ -36,12 +51,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Failed to fetch alerts" }, { status: 500 })
     }
 
-    // Get unread count
     const { count: unreadCount } = await supabase
       .from("alerts")
       .select("*", { count: "exact", head: true })
-      .eq("config_id", config.id)
-      .eq("read", false)
+      .eq("tracking_config_id", config.id)
+      .eq("is_read", false)
 
     return NextResponse.json({
       alerts: alerts || [],
@@ -56,18 +70,30 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const supabase = await createUserClient()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { alertId, read } = await request.json()
 
     if (alertId === "all") {
-      // Mark all as read
-      const { data: config } = await supabase.from("tracking_configs").select("id").limit(1).single()
+      const { data: config } = await supabase
+        .from("tracking_configs")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1)
+        .single()
 
       if (config) {
-        await supabase.from("alerts").update({ read: true }).eq("config_id", config.id)
+        await supabase.from("alerts").update({ is_read: true }).eq("tracking_config_id", config.id)
       }
     } else {
-      // Mark single alert
-      await supabase.from("alerts").update({ read }).eq("id", alertId)
+      await supabase.from("alerts").update({ is_read: read }).eq("id", alertId)
     }
 
     return NextResponse.json({ success: true })
@@ -82,6 +108,14 @@ export async function DELETE(request: Request) {
     const supabase = await createUserClient()
     const { searchParams } = new URL(request.url)
     const alertId = searchParams.get("id")
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
     if (!alertId) {
       return NextResponse.json({ error: "Alert ID required" }, { status: 400 })

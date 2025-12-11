@@ -1,41 +1,45 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServiceRoleClient } from "@/lib/supabase/server"
+import { createUserClient } from "@/lib/supabase/server"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const supabase = await createServiceRoleClient()
+    const supabase = await createUserClient()
 
-    // For now, get the first user's config (will use auth later)
-    const { data: config, error: configError } = await supabase.from("tracking_configs").select("*").limit(1).single()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-    if (configError && configError.code !== "PGRST116") {
-      throw configError
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get profile data
-    const { data: profile, error: profileError } = await supabase.from("profiles").select("*").limit(1).single()
-
-    // Get alert settings
-    const { data: alertSettings, error: alertError } = await supabase
-      .from("alert_settings")
+    const { data: config } = await supabase
+      .from("tracking_configs")
       .select("*")
+      .eq("user_id", user.id)
       .limit(1)
       .single()
 
-    // Get API usage for current month
-    const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
-    const { data: usage, error: usageError } = await supabase
+    const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+
+    const { data: alertSettings } = await supabase.from("alert_settings").select("*").eq("user_id", user.id).single()
+
+    const currentMonth = new Date().toISOString().slice(0, 7)
+    const { data: usage } = await supabase
       .from("api_usage")
       .select("*")
+      .eq("user_id", user.id)
       .eq("month", currentMonth)
       .limit(1)
       .single()
 
-    // Get reports count
-    const { count: reportsCount } = await supabase.from("reports").select("*", { count: "exact", head: true })
+    const { count: reportsCount } = await supabase
+      .from("reports")
+      .select("*", { count: "exact", head: true })
+      .eq("tracking_config_id", config?.id)
 
     return NextResponse.json({
-      profile: profile || null,
+      profile: profile || { email: user.email },
       config: config || null,
       alertSettings: alertSettings || null,
       usage: {
@@ -51,29 +55,37 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createServiceRoleClient()
+    const supabase = await createUserClient()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const body = await request.json()
     const { type, data } = body
 
     if (type === "profile") {
-      const { data: existing } = await supabase.from("profiles").select("id").limit(1).single()
+      const { error } = await supabase.from("profiles").upsert({
+        id: user.id,
+        full_name: data.name,
+        company: data.company,
+        updated_at: new Date().toISOString(),
+      })
 
-      if (existing) {
-        const { error } = await supabase
-          .from("profiles")
-          .update({
-            full_name: data.name,
-            company: data.company,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existing.id)
-
-        if (error) throw error
-      }
+      if (error) throw error
     }
 
     if (type === "tracking") {
-      const { data: existing } = await supabase.from("tracking_configs").select("id").limit(1).single()
+      const { data: existing } = await supabase
+        .from("tracking_configs")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1)
+        .single()
 
       if (existing) {
         const { error } = await supabase
@@ -92,30 +104,9 @@ export async function PUT(request: NextRequest) {
     }
 
     if (type === "notifications") {
-      const { data: existing } = await supabase.from("alert_settings").select("id").limit(1).single()
-
-      if (existing) {
-        const { error } = await supabase
-          .from("alert_settings")
-          .update({
-            email_enabled: data.emailEnabled,
-            score_drop_enabled: data.scoreDropEnabled,
-            score_drop_threshold: Number.parseInt(data.scoreDropThreshold),
-            competitor_alert_enabled: data.competitorEnabled,
-            competitor_threshold: Number.parseInt(data.competitorThreshold),
-            weekly_digest: data.weeklyDigest,
-            digest_day: data.digestDay,
-            quiet_hours_enabled: data.quietHoursEnabled,
-            quiet_start: data.quietStart,
-            quiet_end: data.quietEnd,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existing.id)
-
-        if (error) throw error
-      } else {
-        // Create new alert settings
-        const { error } = await supabase.from("alert_settings").insert({
+      const { error } = await supabase.from("alert_settings").upsert(
+        {
+          user_id: user.id,
           email_enabled: data.emailEnabled,
           score_drop_enabled: data.scoreDropEnabled,
           score_drop_threshold: Number.parseInt(data.scoreDropThreshold),
@@ -126,10 +117,12 @@ export async function PUT(request: NextRequest) {
           quiet_hours_enabled: data.quietHoursEnabled,
           quiet_start: data.quietStart,
           quiet_end: data.quietEnd,
-        })
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      )
 
-        if (error) throw error
-      }
+      if (error) throw error
     }
 
     return NextResponse.json({ success: true })

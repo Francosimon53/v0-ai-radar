@@ -5,14 +5,19 @@ export async function GET() {
   try {
     const supabase = await createUserClient()
 
-    // Get current user (optional - skip auth for now)
-    // const { data: { user } } = await supabase.auth.getUser()
-    // if (!user) {
-    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    // }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-    // Get the first tracking config (for demo purposes without auth)
-    const { data: config, error: configError } = await supabase.from("tracking_configs").select("*").limit(1).single()
+    const { data: config, error: configError } = await supabase
+      .from("tracking_configs")
+      .select("*")
+      .eq("user_id", user.id)
+      .limit(1)
+      .single()
 
     if (configError && configError.code !== "PGRST116") {
       console.error("Config error:", configError)

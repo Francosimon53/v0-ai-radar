@@ -5,7 +5,22 @@ export async function GET() {
   try {
     const supabase = await createUserClient()
 
-    // Get reports with related tracking config
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { data: configs } = await supabase.from("tracking_configs").select("id").eq("user_id", user.id)
+
+    const configIds = (configs || []).map((c) => c.id)
+
+    if (configIds.length === 0) {
+      return NextResponse.json({ reports: [], brands: [] })
+    }
+
     const { data: reports, error } = await supabase
       .from("reports")
       .select(`
@@ -16,11 +31,13 @@ export async function GET() {
         threats,
         recommendations,
         pdf_url,
+        tracking_config_id,
         tracking_configs (
           brand,
           competitors
         )
       `)
+      .in("tracking_config_id", configIds)
       .order("created_at", { ascending: false })
 
     if (error) {
@@ -28,11 +45,9 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Transform data for frontend
     const transformedReports = (reports || []).map((report: any, index: number, arr: any[]) => {
       const previousReport = arr[index + 1]
       const scoreChange = previousReport ? report.brand_score - previousReport.brand_score : 0
-
       const threats = report.threats || []
       const criticalThreats = threats.filter((t: any) => t.severity === "critical" || t.threat_level === "high").length
 
@@ -60,13 +75,9 @@ export async function GET() {
       }
     })
 
-    // Get unique brands for filter
     const brands = [...new Set(transformedReports.map((r: any) => r.brand))]
 
-    return NextResponse.json({
-      reports: transformedReports,
-      brands,
-    })
+    return NextResponse.json({ reports: transformedReports, brands })
   } catch (error) {
     console.error("Reports API error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -83,6 +94,24 @@ export async function DELETE(request: Request) {
     }
 
     const supabase = await createUserClient()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { data: report } = await supabase
+      .from("reports")
+      .select("tracking_config_id, tracking_configs!inner(user_id)")
+      .eq("id", reportId)
+      .single()
+
+    if (!report || (report.tracking_configs as any)?.user_id !== user.id) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
 
     const { error } = await supabase.from("reports").delete().eq("id", reportId)
 

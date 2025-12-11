@@ -5,28 +5,30 @@ export async function POST(request: Request) {
   try {
     const { brand, competitors, industry, alerts } = await request.json()
 
-    // Validate required fields
     if (!brand || !competitors || !industry) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
     const supabase = await createUserClient()
 
-    // Get current user (optional - for demo mode, we'll create a demo config)
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
-    // For demo mode without auth, use a fixed demo user ID
-    const userId = user?.id || "demo-user-id"
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
     // Check if user already has a tracking config
-    const { data: existingConfig } = await supabase.from("tracking_configs").select("id").eq("user_id", userId).single()
+    const { data: existingConfig } = await supabase
+      .from("tracking_configs")
+      .select("id")
+      .eq("user_id", user.id)
+      .single()
 
     let configId: string
 
     if (existingConfig) {
-      // Update existing config
       const { data, error } = await supabase
         .from("tracking_configs")
         .update({
@@ -42,11 +44,10 @@ export async function POST(request: Request) {
       if (error) throw error
       configId = data.id
     } else {
-      // Create new tracking config
       const { data, error } = await supabase
         .from("tracking_configs")
         .insert({
-          user_id: userId,
+          user_id: user.id,
           brand,
           competitors,
           industry,
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
     // Upsert alert settings
     const { error: alertError } = await supabase.from("alert_settings").upsert(
       {
-        user_id: userId,
+        user_id: user.id,
         score_drop_enabled: alerts.scoreDropEnabled,
         score_drop_threshold: Number.parseInt(alerts.scoreDropThreshold),
         competitor_enabled: alerts.competitorEnabled,
@@ -71,14 +72,11 @@ export async function POST(request: Request) {
         weekly_digest_enabled: alerts.weeklyDigestEnabled,
         updated_at: new Date().toISOString(),
       },
-      {
-        onConflict: "user_id",
-      },
+      { onConflict: "user_id" },
     )
 
     if (alertError) {
       console.error("Alert settings error:", alertError)
-      // Don't fail the whole request if alert settings fail
     }
 
     return NextResponse.json({
@@ -95,17 +93,18 @@ export async function POST(request: Request) {
 export async function GET() {
   try {
     const supabase = await createUserClient()
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
-    const userId = user?.id || "demo-user-id"
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-    // Get existing config
-    const { data: config } = await supabase.from("tracking_configs").select("*").eq("user_id", userId).single()
+    const { data: config } = await supabase.from("tracking_configs").select("*").eq("user_id", user.id).single()
 
-    // Get alert settings
-    const { data: alerts } = await supabase.from("alert_settings").select("*").eq("user_id", userId).single()
+    const { data: alerts } = await supabase.from("alert_settings").select("*").eq("user_id", user.id).single()
 
     return NextResponse.json({ config, alerts })
   } catch (error) {
