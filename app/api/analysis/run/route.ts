@@ -118,6 +118,26 @@ export async function POST(request: NextRequest) {
       console.error("[Analysis] Error saving result:", saveError)
     }
 
+    const { error: reportSaveError } = await supabase.from("reports").insert({
+      id: analysisResult.id,
+      user_id: user.id,
+      config_id: configId,
+      brand: config.brand,
+      score: analysisResult.dimensional.brandStrengthIndex,
+      previous_score: historyData?.[0]?.brand_strength_index || null,
+      share_of_voice: analysisResult.shareOfVoice[config.brand]?.mentionRate || 0,
+      threats: analysisResult.threats,
+      recommendations: analysisResult.synthesis.recommendations,
+      strengths: analysisResult.synthesis.strengths,
+      executive_summary: analysisResult.synthesis.executiveSummary,
+      pdf_url: reportUrl,
+      created_at: analysisResult.timestamp,
+    })
+
+    if (reportSaveError) {
+      console.error("[Analysis] Error saving report:", reportSaveError)
+    }
+
     // Record usage
     await recordUsage(user.id, "analysis")
 
