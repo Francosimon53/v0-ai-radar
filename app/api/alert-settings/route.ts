@@ -5,7 +5,20 @@ export async function GET() {
   try {
     const supabase = await createUserClient()
 
-    const { data: config } = await supabase.from("tracking_configs").select("id").limit(1).single()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { data: config } = await supabase
+      .from("tracking_configs")
+      .select("id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .single()
 
     if (!config) {
       return NextResponse.json({ settings: null })
@@ -47,9 +60,23 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const supabase = await createUserClient()
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const settings = await request.json()
 
-    const { data: config } = await supabase.from("tracking_configs").select("id").limit(1).single()
+    const { data: config } = await supabase
+      .from("tracking_configs")
+      .select("id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .single()
 
     if (!config) {
       return NextResponse.json({ error: "No tracking config found" }, { status: 400 })
