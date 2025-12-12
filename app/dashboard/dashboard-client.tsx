@@ -16,7 +16,6 @@ import {
   Lightbulb,
   Shield,
 } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
@@ -54,8 +53,8 @@ interface DashboardData {
 export default function DashboardClient() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [runningAnalysis, setRunningAnalysis] = useState(false)
-  const { toast } = useToast()
+  const [isRunning, setIsRunning] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -72,11 +71,7 @@ export default function DashboardClient() {
       setDashboardData(data)
     } catch (error) {
       console.error("[v0] Failed to load dashboard:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load dashboard data",
-        variant: "destructive",
-      })
+      setRunError("Failed to load dashboard data")
     } finally {
       setLoading(false)
     }
@@ -86,38 +81,33 @@ export default function DashboardClient() {
     if (!dashboardData?.configId) return
 
     try {
-      setRunningAnalysis(true)
+      setRunError(null)
+      setIsRunning(true)
       console.log("[v0] Starting analysis for config:", dashboardData.configId)
 
-      const res = await fetch("/api/analysis/run", {
+      const response = await fetch("/api/analysis/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ configId: dashboardData.configId }),
       })
 
-      const result = await res.json()
-      console.log("[v0] Analysis result:", result)
-
-      if (!res.ok) {
-        throw new Error(result.error || result.message || "Analysis failed")
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null)
+        console.error("[v0] Run analysis failed:", response.status, errorBody)
+        setRunError(errorBody?.error || errorBody?.message || "Analysis failed. Please try again.")
+        return
       }
 
-      toast({
-        title: "Success",
-        description: `Analysis completed! Brand score: ${result.brandScore}/100`,
-      })
+      const result = await response.json()
+      console.log("[v0] Run analysis succeeded:", result)
 
-      // Reload dashboard to show new results
+      router.refresh()
       await loadDashboard()
-    } catch (error) {
-      console.error("[v0] Analysis error:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to run analysis",
-        variant: "destructive",
-      })
+    } catch (err) {
+      console.error("[v0] Run analysis error:", err)
+      setRunError("Unexpected error while running analysis.")
     } finally {
-      setRunningAnalysis(false)
+      setIsRunning(false)
     }
   }
 
@@ -205,11 +195,11 @@ export default function DashboardClient() {
                 <p className="mb-4 text-sm text-zinc-400">We scan how AI assistants see and recommend your brand.</p>
                 <Button
                   onClick={handleRunAnalysis}
-                  disabled={runningAnalysis}
+                  disabled={isRunning}
                   className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
                   size="sm"
                 >
-                  {runningAnalysis ? (
+                  {isRunning ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Running...
@@ -218,6 +208,7 @@ export default function DashboardClient() {
                     "Run first analysis"
                   )}
                 </Button>
+                {runError && <p className="mt-2 text-sm text-red-400">{runError}</p>}
               </div>
             </div>
           </CardContent>
@@ -290,11 +281,11 @@ export default function DashboardClient() {
 
             <Button
               onClick={handleRunAnalysis}
-              disabled={runningAnalysis}
+              disabled={isRunning}
               className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold"
               size="lg"
             >
-              {runningAnalysis ? (
+              {isRunning ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Running Analysis...
@@ -306,6 +297,7 @@ export default function DashboardClient() {
                 </>
               )}
             </Button>
+            {runError && <p className="mt-2 text-sm text-red-400 text-center">{runError}</p>}
           </div>
         </div>
       </div>
@@ -492,8 +484,8 @@ export default function DashboardClient() {
               Run your first analysis to see how AI models perceive your brand's strengths, weaknesses, opportunities,
               and threats.
             </p>
-            <Button onClick={handleRunAnalysis} disabled={runningAnalysis} className="bg-blue-600 hover:bg-blue-700">
-              {runningAnalysis ? (
+            <Button onClick={handleRunAnalysis} disabled={isRunning} className="bg-blue-600 hover:bg-blue-700">
+              {isRunning ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Running...
@@ -502,6 +494,7 @@ export default function DashboardClient() {
                 "Run First Analysis"
               )}
             </Button>
+            {runError && <p className="mt-2 text-sm text-red-400">{runError}</p>}
           </div>
         </Card>
       )}
