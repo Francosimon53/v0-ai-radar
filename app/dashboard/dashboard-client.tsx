@@ -1,6 +1,6 @@
 "use client"
 
-// v2.0 - Updated dashboard with onboarding and enhanced layout
+// v3.0 - Force new deployment with cache bust
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -136,10 +136,14 @@ export default function DashboardClient() {
 
   const { brand, metrics, latestAnalysis } = dashboardData
 
-  const isFirstTime = !latestAnalysis && metrics.analysesRun === 0
+  const isFirstTime = !latestAnalysis
 
   return (
     <div className="space-y-8">
+      <div className="fixed bottom-4 right-4 z-50 rounded-md bg-zinc-900 px-3 py-1.5 text-xs text-zinc-500 border border-zinc-800">
+        v3.0
+      </div>
+
       {isFirstTime && (
         <Card className="border-blue-500/20 bg-gradient-to-br from-blue-950/20 via-zinc-900 to-zinc-950">
           <CardHeader>
