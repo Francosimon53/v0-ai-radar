@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 interface DashboardData {
   hasConfig: boolean
@@ -55,6 +56,7 @@ export default function DashboardClient() {
   const [loading, setLoading] = useState(true)
   const [runningAnalysis, setRunningAnalysis] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
 
   useEffect(() => {
     loadDashboard()
@@ -142,8 +144,86 @@ export default function DashboardClient() {
 
   const { brand, metrics, latestAnalysis } = dashboardData
 
+  const isFirstTime = !latestAnalysis && metrics.analysesRun === 0
+
   return (
     <div className="space-y-8">
+      {isFirstTime && (
+        <Card className="border-blue-500/20 bg-gradient-to-br from-blue-950/20 via-zinc-900 to-zinc-950">
+          <CardHeader>
+            <CardTitle className="text-2xl text-white">Get your first AI brand report in 3 steps</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              {/* Step 1: Settings */}
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-6">
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10 text-blue-500 font-bold">
+                    1
+                  </div>
+                  <h3 className="font-semibold text-white">Confirm your brand & industry</h3>
+                </div>
+                <p className="mb-4 text-sm text-zinc-400">We use this to understand your AI context.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/dashboard/settings")}
+                  className="w-full border-zinc-700 hover:bg-zinc-800"
+                >
+                  Review settings
+                </Button>
+              </div>
+
+              {/* Step 2: Competitors */}
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-6">
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10 text-blue-500 font-bold">
+                    2
+                  </div>
+                  <h3 className="font-semibold text-white">Add competitors</h3>
+                  {metrics.competitorsCount > 0 && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                </div>
+                <p className="mb-4 text-sm text-zinc-400">Tell us who to compare you against.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/dashboard/competitors")}
+                  className="w-full border-zinc-700 hover:bg-zinc-800"
+                >
+                  {metrics.competitorsCount > 0 ? "Manage competitors" : "Add competitors"}
+                </Button>
+              </div>
+
+              {/* Step 3: Run Analysis */}
+              <div className="rounded-lg border border-blue-500/30 bg-gradient-to-br from-blue-950/30 to-zinc-950 p-6">
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white font-bold">
+                    3
+                  </div>
+                  <h3 className="font-semibold text-white">Run your first AI analysis</h3>
+                </div>
+                <p className="mb-4 text-sm text-zinc-400">We scan how AI assistants see and recommend your brand.</p>
+                <Button
+                  onClick={handleRunAnalysis}
+                  disabled={runningAnalysis}
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                  size="sm"
+                >
+                  {runningAnalysis ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    "Run first analysis"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ZONE 1: HERO SECTION - "How AI sees your brand" */}
       <div className="rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 p-8">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
