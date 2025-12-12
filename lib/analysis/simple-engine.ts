@@ -44,17 +44,37 @@ export interface SimpleAnalysisResult {
   processingTime: number
   queriesRun: number
   queriesSucceeded: number
+
+  // Additional AI insights
+  aiPositioning: {
+    overallRole: string
+    typicalRank: string
+    positioningNarrative: string
+  }
+  recommendationContexts: {
+    context: string
+    role: string
+    comment: string
+  }[]
+  visibilityGaps: string[]
 }
 
-const ANALYSIS_PROMPT = (brand: string, competitors: string[], industry: string) => `
-You are an AI brand perception analyst. Analyze how AI models perceive the brand "${brand}" in the ${industry} industry.
+const ANALYSIS_PROMPT = (brand: string, industry: string, competitors: string[]) => `
+You are an AI brand perception analyst. Analyze how AI models perceive, recommend, and position the brand "${brand}" in the "${industry}" industry.
 
 Competitors: ${competitors.join(", ") || "None specified"}
 
+Your job is to:
+- Understand how large language models and AI assistants typically describe this brand.
+- Evaluate how often and in what ROLE the brand appears in recommendations versus these competitors.
+- Identify strengths, weaknesses, opportunities, and threats in the current AI-mediated perception.
+- Highlight where the brand is invisible, under-recommended, or framed in a limiting way.
+
 Provide a JSON response with this exact structure:
+
 {
-  "brandScore": <number 0-100, overall brand strength>,
-  "shareOfVoice": <number 0-100, estimated share vs competitors>,
+  "brandScore": <number 0-100, overall brand strength in AI perception>,
+  "shareOfVoice": <number 0-100, estimated share vs competitors in AI answers>,
   "sentiment": "<positive|neutral|negative>",
   "keyPhrases": ["<phrase1>", "<phrase2>", "<phrase3>"],
   "strengths": ["<strength1>", "<strength2>"],
@@ -62,13 +82,34 @@ Provide a JSON response with this exact structure:
   "opportunities": ["<opportunity1>", "<opportunity2>"],
   "threats": ["<threat1>", "<threat2>"],
   "competitorScores": [
-    {"name": "<competitor>", "score": <0-100>, "shareOfVoice": <0-100>}
+    {
+      "name": "<competitor name>",
+      "score": <0-100, AI perception strength vs this brand>,
+      "shareOfVoice": <0-100, estimated share vs this brand>
+    }
   ],
-  "summary": "<2-3 sentence executive summary>"
+  "summary": "<2-3 sentence executive summary explaining how AI currently sees this brand vs competitors>",
+  "aiPositioning": {
+    "overallRole": "<default_choice | strong_alternative | niche_option | rarely_mentioned | absent>",
+    "typicalRank": "<summary of how often the brand appears as #1, #2-3, or lower in AI-style recommendations>",
+    "positioningNarrative": "<short paragraph describing the main story AI tends to tell about this brand>"
+  },
+  "recommendationContexts": [
+    {
+      "context": "<type of query or use case where the brand is recommended (e.g. 'best for privacy-focused users')>",
+      "role": "<primary | secondary | backup>",
+      "comment": "<1 sentence explaining why AI tends to recommend the brand this way>"
+    }
+  ],
+  "visibilityGaps": [
+    "<short bullet describing where the brand should appear in AI answers but currently does not or appears weakly>"
+  ]
 }
 
-Be objective and analytical. Base scores on brand reputation, market presence, and perception factors.
-Return ONLY valid JSON, no markdown or explanation.
+Be objective and analytical. Base scores on brand reputation, market presence, and perception factors as you infer them.
+Focus specifically on AI-mediated perception and recommendation, not generic marketing theory.
+Keep arrays concise (2–6 items each).
+Return ONLY valid JSON, no markdown, no commentary, no extra text around the JSON.
 `
 
 async function queryModel(
@@ -113,7 +154,7 @@ export async function runSimpleAnalysis(
   // Query only OpenAI and Anthropic - the models we know work
   const models = ["openai/gpt-4o-mini", "anthropic/claude-sonnet-4-20250514"]
 
-  const prompt = ANALYSIS_PROMPT(brand, competitors, industry)
+  const prompt = ANALYSIS_PROMPT(brand, industry, competitors)
 
   // Run queries in parallel
   const results = await Promise.all(models.map((model) => queryModel(model, prompt)))
@@ -143,6 +184,13 @@ export async function runSimpleAnalysis(
       processingTime: Date.now() - startTime,
       queriesRun: models.length,
       queriesSucceeded: 0,
+      aiPositioning: {
+        overallRole: "",
+        typicalRank: "",
+        positioningNarrative: "",
+      },
+      recommendationContexts: [],
+      visibilityGaps: [],
     }
   }
 
@@ -176,6 +224,9 @@ export async function runSimpleAnalysis(
     processingTime: Date.now() - startTime,
     queriesRun: models.length,
     queriesSucceeded,
+    aiPositioning: aggregated.aiPositioning,
+    recommendationContexts: aggregated.recommendationContexts,
+    visibilityGaps: aggregated.visibilityGaps,
   }
 }
 
@@ -189,6 +240,17 @@ function aggregateResults(results: any[]): {
   opportunities: string[]
   threats: string[]
   summary: string
+  aiPositioning: {
+    overallRole: string
+    typicalRank: string
+    positioningNarrative: string
+  }
+  recommendationContexts: {
+    context: string
+    role: string
+    comment: string
+  }[]
+  visibilityGaps: string[]
 } {
   // Average numeric scores
   const brandScore = Math.round(results.reduce((sum, r) => sum + (r.brandScore || 50), 0) / results.length)
@@ -235,6 +297,24 @@ function aggregateResults(results: any[]): {
   // Use first valid summary
   const summary = results.find((r) => r.summary)?.summary || "Analysis complete."
 
+  // Aggregate AI positioning
+  const aiPositionings = results.map((r) => r.aiPositioning || {})
+  const overallRoles = aiPositionings.map((p) => p.overallRole).filter(Boolean)
+  const typicalRanks = aiPositionings.map((p) => p.typicalRank).filter(Boolean)
+  const positioningNarratives = aiPositionings.map((p) => p.positioningNarrative).filter(Boolean)
+
+  const aiPositioning = {
+    overallRole: overallRoles.length > 0 ? overallRoles[0] : "",
+    typicalRank: typicalRanks.length > 0 ? typicalRanks[0] : "",
+    positioningNarrative: positioningNarratives.length > 0 ? positioningNarratives[0] : "",
+  }
+
+  // Aggregate recommendation contexts
+  const recommendationContexts = results.flatMap((r) => r.recommendationContexts || []).slice(0, 6)
+
+  // Aggregate visibility gaps
+  const visibilityGaps = results.flatMap((r) => r.visibilityGaps || []).slice(0, 6)
+
   return {
     brandScore,
     shareOfVoice,
@@ -245,5 +325,8 @@ function aggregateResults(results: any[]): {
     opportunities,
     threats,
     summary,
+    aiPositioning,
+    recommendationContexts,
+    visibilityGaps,
   }
 }
