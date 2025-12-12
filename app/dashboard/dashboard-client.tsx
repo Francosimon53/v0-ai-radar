@@ -372,226 +372,219 @@ export default function DashboardClient() {
       </div>
 
       {/* ZONE 3: AI SWOT SNAPSHOT */}
-      {latestAnalysis ? (
-        <div>
-          <h2 className="mb-4 text-2xl font-bold text-white">AI SWOT Snapshot</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* Strengths */}
-            <Card className="border-green-500/20 bg-zinc-900">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="rounded-lg bg-green-500/10 p-1.5">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  </div>
-                  <CardTitle className="text-base text-white">Strengths</CardTitle>
+      <div>
+        <h2 className="mb-4 text-2xl font-bold text-white">AI SWOT Snapshot</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Strengths */}
+          <Card className="border-green-500/20 bg-zinc-900">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-green-500/10 p-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
                 </div>
-              </CardHeader>
-              <CardContent>
-                {latestAnalysis.strengths && latestAnalysis.strengths.length > 0 ? (
-                  <ul className="space-y-2">
-                    {latestAnalysis.strengths.slice(0, 3).map((strength, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
-                        <span className="mt-1 text-green-500">•</span>
-                        <span>{strength}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-zinc-500">No data yet.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Weaknesses */}
-            <Card className="border-yellow-500/20 bg-zinc-900">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="rounded-lg bg-yellow-500/10 p-1.5">
-                    <AlertCircle className="h-4 w-4 text-yellow-500" />
-                  </div>
-                  <CardTitle className="text-base text-white">Weaknesses</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {latestAnalysis.weaknesses && latestAnalysis.weaknesses.length > 0 ? (
-                  <ul className="space-y-2">
-                    {latestAnalysis.weaknesses.slice(0, 3).map((weakness, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
-                        <span className="mt-1 text-yellow-500">•</span>
-                        <span>{weakness}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-zinc-500">No data yet.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Opportunities */}
-            <Card className="border-blue-500/20 bg-zinc-900">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="rounded-lg bg-blue-500/10 p-1.5">
-                    <Lightbulb className="h-4 w-4 text-blue-500" />
-                  </div>
-                  <CardTitle className="text-base text-white">Opportunities</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {latestAnalysis.opportunities && latestAnalysis.opportunities.length > 0 ? (
-                  <ul className="space-y-2">
-                    {latestAnalysis.opportunities.slice(0, 3).map((opportunity, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
-                        <span className="mt-1 text-blue-500">•</span>
-                        <span>{opportunity}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-zinc-500">No data yet.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Threats */}
-            <Card className="border-red-500/20 bg-zinc-900">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="rounded-lg bg-red-500/10 p-1.5">
-                    <Shield className="h-4 w-4 text-red-500" />
-                  </div>
-                  <CardTitle className="text-base text-white">Threats</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {latestAnalysis.threats && latestAnalysis.threats.length > 0 ? (
-                  <ul className="space-y-2">
-                    {latestAnalysis.threats.slice(0, 3).map((threat, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
-                        <span className="mt-1 text-red-500">•</span>
-                        <span>{threat}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-zinc-500">No data yet.</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      ) : (
-        <Card className="border-zinc-800 bg-zinc-900 p-12">
-          <div className="flex flex-col items-center justify-center text-center">
-            <Target className="mb-4 h-12 w-12 text-zinc-600" />
-            <h3 className="mb-2 text-xl font-semibold text-white">No Analysis Yet</h3>
-            <p className="mb-6 max-w-md text-zinc-400">
-              Run your first analysis to see how AI models perceive your brand's strengths, weaknesses, opportunities,
-              and threats.
-            </p>
-            <Button onClick={handleRunAnalysis} disabled={isRunning} className="bg-blue-600 hover:bg-blue-700">
-              {isRunning ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Running...
-                </>
+                <CardTitle className="text-base text-white">Strengths</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {latestAnalysis?.strengths && latestAnalysis.strengths.length > 0 ? (
+                <ul className="space-y-2">
+                  {latestAnalysis.strengths.slice(0, 3).map((strength, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
+                      <span className="mt-1 text-green-500">•</span>
+                      <span>{strength}</span>
+                    </li>
+                  ))}
+                </ul>
               ) : (
-                "Run First Analysis"
+                <p className="text-sm text-zinc-500 italic">
+                  Your strengths will appear here after your first AI analysis.
+                </p>
               )}
-            </Button>
-            {runError && <p className="mt-2 text-sm text-red-400">{runError}</p>}
-          </div>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+
+          {/* Weaknesses */}
+          <Card className="border-yellow-500/20 bg-zinc-900">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-yellow-500/10 p-1.5">
+                  <AlertCircle className="h-4 w-4 text-yellow-500" />
+                </div>
+                <CardTitle className="text-base text-white">Weaknesses</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {latestAnalysis?.weaknesses && latestAnalysis.weaknesses.length > 0 ? (
+                <ul className="space-y-2">
+                  {latestAnalysis.weaknesses.slice(0, 3).map((weakness, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
+                      <span className="mt-1 text-yellow-500">•</span>
+                      <span>{weakness}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-zinc-500 italic">
+                  Your weaknesses will appear here after your first AI analysis.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Opportunities */}
+          <Card className="border-blue-500/20 bg-zinc-900">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-blue-500/10 p-1.5">
+                  <Lightbulb className="h-4 w-4 text-blue-500" />
+                </div>
+                <CardTitle className="text-base text-white">Opportunities</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {latestAnalysis?.opportunities && latestAnalysis.opportunities.length > 0 ? (
+                <ul className="space-y-2">
+                  {latestAnalysis.opportunities.slice(0, 3).map((opportunity, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
+                      <span className="mt-1 text-blue-500">•</span>
+                      <span>{opportunity}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-zinc-500 italic">
+                  Your opportunities will appear here after your first AI analysis.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Threats */}
+          <Card className="border-red-500/20 bg-zinc-900">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-red-500/10 p-1.5">
+                  <Shield className="h-4 w-4 text-red-500" />
+                </div>
+                <CardTitle className="text-base text-white">Threats</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {latestAnalysis?.threats && latestAnalysis.threats.length > 0 ? (
+                <ul className="space-y-2">
+                  {latestAnalysis.threats.slice(0, 3).map((threat, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
+                      <span className="mt-1 text-red-500">•</span>
+                      <span>{threat}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-zinc-500 italic">
+                  Your threats will appear here after your first AI analysis.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* ZONE 4: COMPETITORS & AI MODELS */}
-      {latestAnalysis && (latestAnalysis.competitorScores?.length > 0 || latestAnalysis.modelBreakdown?.length > 0) && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Left: Competitor Comparison */}
-          {latestAnalysis.competitorScores && latestAnalysis.competitorScores.length > 0 && (
-            <Card className="border-zinc-800 bg-zinc-900">
-              <CardHeader>
-                <CardTitle className="text-white">Competitor Comparison</CardTitle>
-                <p className="text-sm text-zinc-400">How your brand scores vs competitors in AI responses</p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {latestAnalysis.competitorScores.map((competitor, i) => (
-                    <div key={i}>
-                      <div className="mb-2 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-white">{competitor.name}</span>
-                          {i === 0 && (
-                            <Badge
-                              variant="outline"
-                              className="border-blue-500/50 bg-blue-500/10 text-blue-500 text-xs"
-                            >
-                              Top
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-zinc-400">{competitor.shareOfVoice}% SoV</span>
-                          <span className="font-semibold text-white">{competitor.score}</span>
-                        </div>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500"
-                          style={{ width: `${competitor.score}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Right: AI Models Breakdown */}
-          {latestAnalysis.modelBreakdown && latestAnalysis.modelBreakdown.length > 0 && (
-            <Card className="border-zinc-800 bg-zinc-900">
-              <CardHeader>
-                <CardTitle className="text-white">AI Models Breakdown</CardTitle>
-                <p className="text-sm text-zinc-400">How different AI models perceive your brand</p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {latestAnalysis.modelBreakdown.map((model, i) => (
-                    <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="font-medium text-white">{model.model}</span>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className={`border-0 text-xs ${
-                              model.sentiment === "positive"
-                                ? "bg-green-500/10 text-green-500"
-                                : model.sentiment === "negative"
-                                  ? "bg-red-500/10 text-red-500"
-                                  : "bg-zinc-700 text-zinc-400"
-                            }`}
-                          >
-                            {model.sentiment}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Left: Competitor Comparison */}
+        <Card className="border-zinc-800 bg-zinc-900">
+          <CardHeader>
+            <CardTitle className="text-white">Competitor Comparison</CardTitle>
+            <p className="text-sm text-zinc-400">How your brand scores vs competitors in AI responses</p>
+          </CardHeader>
+          <CardContent>
+            {latestAnalysis?.competitorScores && latestAnalysis.competitorScores.length > 0 ? (
+              <div className="space-y-4">
+                {latestAnalysis.competitorScores.map((competitor, i) => (
+                  <div key={i}>
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-white">{competitor.name}</span>
+                        {i === 0 && (
+                          <Badge variant="outline" className="border-blue-500/50 bg-blue-500/10 text-blue-500 text-xs">
+                            Top
                           </Badge>
-                          <span className="text-sm font-semibold text-white">{model.score}</span>
-                        </div>
+                        )}
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500"
-                          style={{ width: `${model.score}%` }}
-                        />
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-zinc-400">{competitor.shareOfVoice}% SoV</span>
+                        <span className="font-semibold text-white">{competitor.score}</span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+                    <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500"
+                        style={{ width: `${competitor.score}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <Users className="mx-auto mb-3 h-10 w-10 text-zinc-700" />
+                <p className="text-sm text-zinc-500 italic">
+                  Once you run your first analysis, you'll see how each competitor is ranked by AI here.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Right: AI Models Breakdown */}
+        <Card className="border-zinc-800 bg-zinc-900">
+          <CardHeader>
+            <CardTitle className="text-white">AI Models Breakdown</CardTitle>
+            <p className="text-sm text-zinc-400">How different AI models perceive your brand</p>
+          </CardHeader>
+          <CardContent>
+            {latestAnalysis?.modelBreakdown && latestAnalysis.modelBreakdown.length > 0 ? (
+              <div className="space-y-4">
+                {latestAnalysis.modelBreakdown.map((model, i) => (
+                  <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="font-medium text-white">{model.model}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className={`border-0 text-xs ${
+                            model.sentiment === "positive"
+                              ? "bg-green-500/10 text-green-500"
+                              : model.sentiment === "negative"
+                                ? "bg-red-500/10 text-red-500"
+                                : "bg-zinc-700 text-zinc-400"
+                          }`}
+                        >
+                          {model.sentiment}
+                        </Badge>
+                        <span className="text-sm font-semibold text-white">{model.score}</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500"
+                        style={{ width: `${model.score}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <Target className="mx-auto mb-3 h-10 w-10 text-zinc-700" />
+                <p className="text-sm text-zinc-500 italic">
+                  After your first analysis, this section will show how each AI model scores your brand.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
