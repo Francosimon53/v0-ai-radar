@@ -308,6 +308,27 @@ export default function DashboardClient() {
         </div>
       </div>
 
+      {/* Placeholder preview card to explain what appears after first analysis */}
+      <Card className="mt-8 border-zinc-800 bg-zinc-900">
+        <CardHeader>
+          <CardTitle className="text-xl text-white">Next: AI SWOT & competitor insights</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-zinc-300">
+          <p>
+            After your first AI analysis, this area will transform into a premium consulting-style view of your
+            brand&apos;s AI presence.
+          </p>
+          <ul className="list-disc list-inside space-y-1">
+            <li>AI SWOT snapshot of strengths, weaknesses, opportunities and threats.</li>
+            <li>Side-by-side competitor comparison based on AI scores and share of voice.</li>
+            <li>Breakdown of how different AI models describe and rank your brand.</li>
+          </ul>
+          <p className="text-zinc-400">
+            For now, this is a preview of what you and your clients will see once the first analysis has been generated.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* ZONE 2: KPI CARDS ROW */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="border-zinc-800 bg-zinc-900">
