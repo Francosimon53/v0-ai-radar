@@ -17,6 +17,8 @@ import {
   AlertCircle,
   Lightbulb,
   Shield,
+  Sparkles,
+  FileText,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -223,51 +225,39 @@ export default function DashboardClient() {
 
       {/* ZONE 1: HERO SECTION - "How AI sees your brand" */}
       <div className="rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 p-8">
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
-          {/* Left side: Brand perception */}
-          <div className="flex-1">
-            <h1 className="mb-3 text-4xl font-bold text-white">
-              How AI sees{" "}
-              <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                {brand?.name}
-              </span>
-            </h1>
-
-            {/* Large Score Display */}
-            <div className="mb-4 flex items-end gap-4">
-              <div>
-                <p className="mb-1 text-sm font-medium text-zinc-400">Brand Health Score</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-6xl font-bold text-white">{brand?.score || 0}</span>
-                  <span className="text-2xl text-zinc-500">/ 100</span>
-                </div>
-              </div>
-
-              {/* Sentiment Badge */}
-              {brand?.sentiment && (
-                <Badge
-                  variant="outline"
-                  className={`mb-2 h-fit border-0 px-4 py-1.5 text-sm font-semibold ${
-                    brand.sentiment === "positive"
-                      ? "bg-green-500/10 text-green-500"
-                      : brand.sentiment === "negative"
-                        ? "bg-red-500/10 text-red-500"
-                        : "bg-zinc-700 text-zinc-300"
-                  }`}
-                >
-                  {brand.sentiment.charAt(0).toUpperCase() + brand.sentiment.slice(1)}
-                </Badge>
-              )}
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-4">
+            <h1 className="text-3xl font-bold tracking-tight">How AI sees {brand?.name}</h1>
+            <p className="text-zinc-400 max-w-xl">
+              {latestAnalysis?.summary ||
+                "Run your first analysis to see how AI models perceive and recommend your brand."}
+            </p>
+            <div className="flex flex-wrap gap-3 pt-2">
+              <Button
+                onClick={handleRunAnalysis}
+                disabled={isRunning}
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Running Analysis...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Run Analysis
+                  </>
+                )}
+              </Button>
+              <Link href="/dashboard/reports/vip-demo">
+                <Button variant="outline" className="border-zinc-700 hover:bg-zinc-800 bg-transparent">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Preview VIP AI Brand Report
+                </Button>
+              </Link>
             </div>
-
-            {/* Executive Summary */}
-            {latestAnalysis?.summary ? (
-              <p className="max-w-2xl text-base leading-relaxed text-zinc-300">{latestAnalysis.summary}</p>
-            ) : (
-              <p className="max-w-2xl text-base leading-relaxed text-zinc-400">
-                Run your first analysis to see how AI models perceive your brand across different contexts and queries.
-              </p>
-            )}
+            {runError && <p className="text-sm text-red-400">{runError}</p>}
           </div>
 
           {/* Right side: Quick stats + Run button */}
