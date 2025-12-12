@@ -2,83 +2,61 @@ import ReportDetailClient from "../[id]/report-detail-client"
 import { Badge } from "@/components/ui/badge"
 
 const demoReport = {
-  id: "demo-001",
+  id: "demo-nike-001",
   createdAt: new Date().toISOString(),
-  brandName: "Acme Corp",
-  overallScore: 72,
-  previousScore: 65,
+  brandName: "Nike",
+  overallScore: 82,
+  previousScore: 76,
   sentiment: "positive" as const,
   summary:
-    "Acme Corp shows strong brand recognition in AI conversations, particularly in the B2B software space. ChatGPT and Claude consistently mention Acme when users ask about enterprise solutions, though there's room to improve visibility in the SMB segment. The brand is perceived as reliable and innovative, with AI models frequently highlighting your cloud infrastructure and customer support as key differentiators.",
+    "Nike enjoys strong AI visibility and generally positive sentiment across major AI assistants. Most models associate the brand with performance, innovation, and global reach, but there are areas to improve around price perception and sustainability messaging.",
   strengths: [
-    "Strong association with enterprise-grade reliability",
-    "Frequently mentioned alongside industry leaders like Salesforce and HubSpot",
-    "AI models highlight exceptional customer support as a key differentiator",
-    "Cloud infrastructure is perceived as cutting-edge",
-    "Positive sentiment around recent product launches",
+    "Strong association with performance and elite athletes.",
+    "High global recognition across multiple markets.",
+    "Consistent brand voice across most AI-generated answers.",
   ],
   weaknesses: [
-    "Limited visibility in SMB-focused conversations",
-    "Pricing perceived as premium compared to newer competitors",
-    "Mobile experience rarely mentioned by AI models",
-    "Brand story not well articulated in AI responses",
+    "Some models highlight high prices as a barrier.",
+    "Mixed signals around sustainability commitments.",
+    "Occasional confusion with specific product lines in search.",
   ],
   opportunities: [
-    "Expand content strategy to target SMB keywords",
-    "Create more case studies for AI training data",
-    "Develop thought leadership content on emerging trends",
-    "Partner with AI companies for better brand representation",
+    "Leverage AI assistants for personalized product guidance.",
+    "Strengthen sustainability narrative in long-form answers.",
+    "Own more conversational queries around training and coaching.",
   ],
   threats: [
-    "Emerging competitors gaining AI mindshare rapidly",
-    "Negative reviews from 2023 still surface in some AI responses",
-    "Category becoming commoditized in AI recommendations",
-    "Competitors investing heavily in AI-optimized content",
+    "Competitors gaining AI visibility on budget-friendly segments.",
+    "Shadow content from unofficial resellers creating noise.",
+    "Risk of outdated training data on some models.",
   ],
   competitorScores: [
-    { name: "Acme Corp (You)", score: 72, shareOfVoice: 28 },
-    { name: "TechRival Inc", score: 78, shareOfVoice: 32 },
-    { name: "CloudFirst", score: 65, shareOfVoice: 22 },
-    { name: "DataFlow", score: 58, shareOfVoice: 18 },
+    { name: "Nike (You)", score: 82, shareOfVoice: 34 },
+    { name: "Adidas", score: 78, shareOfVoice: 24 },
+    { name: "Puma", score: 71, shareOfVoice: 16 },
+    { name: "Under Armour", score: 67, shareOfVoice: 14 },
   ],
   modelBreakdown: [
-    { model: "GPT-4o", score: 75, sentiment: "positive" as const },
-    { model: "Claude 3.5", score: 71, sentiment: "positive" as const },
-    { model: "Gemini Pro", score: 68, sentiment: "neutral" as const },
-    { model: "Llama 3", score: 70, sentiment: "positive" as const },
+    { model: "ChatGPT", score: 85, sentiment: "positive" as const },
+    { model: "Claude", score: 80, sentiment: "positive" as const },
+    { model: "Gemini", score: 78, sentiment: "positive" as const },
   ],
-  keyPhrases: [
-    "enterprise solution",
-    "reliable platform",
-    "cloud infrastructure",
-    "customer support",
-    "B2B software",
-    "scalable",
-    "secure",
-    "integration capabilities",
-    "industry leader",
-    "trusted provider",
-  ],
+  keyPhrases: ["high-performance sportswear", "elite athletes", "global brand", "running shoes", "innovation"],
   recommendations: [
-    { id: 1, title: "Create 10+ case studies optimized for AI crawlers", priority: "high" as const },
-    { id: 2, title: "Address 2023 negative reviews with public responses", priority: "high" as const },
-    { id: 3, title: "Develop SMB-focused landing pages and content", priority: "high" as const },
-    { id: 4, title: "Publish monthly thought leadership articles", priority: "medium" as const },
-    { id: 5, title: "Update product documentation for AI readability", priority: "medium" as const },
-    { id: 6, title: "Launch customer testimonial video series", priority: "medium" as const },
-    { id: 7, title: "Optimize mobile experience and promote it", priority: "low" as const },
-    { id: 8, title: "Create comparison pages vs top competitors", priority: "low" as const },
-    { id: 9, title: "Build AI-specific FAQ section on website", priority: "low" as const },
+    { id: 1, title: "Launch a focused AI content playbook for top 20 product queries.", priority: "high" as const },
+    { id: 2, title: "Update sustainability messaging across long-form AI responses.", priority: "high" as const },
+    { id: 3, title: "Create exclusive AI-powered training journeys for runners.", priority: "medium" as const },
+    { id: 4, title: "Differentiate clearly between premium and entry-level lines.", priority: "medium" as const },
+    { id: 5, title: "Monitor and clean up unofficial reseller mentions.", priority: "low" as const },
   ],
 }
 
 export default function VIPDemoPage() {
   return (
     <div>
-      {/* Demo banner */}
-      <div className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2">
-        <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">Demo Mode</Badge>
-        <span className="text-sm text-amber-300">This is sample data – not yet connected to live AI models</span>
+      <div className="sticky top-0 z-50 flex items-center justify-center gap-3 bg-purple-500/10 border-b border-purple-500/20 px-4 py-3">
+        <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 font-semibold">VIP DEMO</Badge>
+        <span className="text-sm text-purple-200">This report uses sample data to preview the premium layout</span>
       </div>
 
       {/* Reuse the existing premium report layout */}
