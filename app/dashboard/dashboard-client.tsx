@@ -105,10 +105,10 @@ export default function DashboardClient() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">{data.brand}</h1>
-          <p className="text-muted-foreground">Brand Health Score</p>
+          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+          <p className="text-zinc-400">Brand Health Score</p>
         </div>
-        <Button onClick={handleRunAnalysis} disabled={isRunningAnalysis}>
+        <Button onClick={handleRunAnalysis} disabled={isRunningAnalysis} className="bg-blue-500 hover:bg-blue-600">
           {isRunningAnalysis ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -124,54 +124,54 @@ export default function DashboardClient() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
+        <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Brand Score</CardTitle>
+            <CardTitle className="text-sm text-zinc-400">Brand Score</CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" /> {/* Use Target component */}
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.score}/100</div>
+            <div className="text-2xl font-bold text-white">{data.score}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Share of Voice</CardTitle>
+            <CardTitle className="text-sm text-zinc-400">Share of Voice</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.shareOfVoice}%</div>
+            <div className="text-2xl font-bold text-white">{data.shareOfVoice}%</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Competitors</CardTitle>
+            <CardTitle className="text-sm text-zinc-400">Competitors</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.competitorsCount}</div>
+            <div className="text-2xl font-bold text-white">{data.competitorsCount}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Analyses</CardTitle>
+            <CardTitle className="text-sm text-zinc-400">Analyses</CardTitle>
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.analysisCount}</div>
+            <div className="text-2xl font-bold text-white">{data.analysisCount}</div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
+      <Card className="bg-zinc-900 border-zinc-800">
         <CardHeader>
-          <CardTitle>Ready to analyze {data.brand}</CardTitle>
+          <CardTitle className="text-white">Ready to analyze {data.brand}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground mb-4">Run your first analysis to see how AI models perceive your brand</p>
-          <Button onClick={handleRunAnalysis} disabled={isRunningAnalysis}>
+          <p className="text-zinc-400 mb-4">Run your first analysis to see how AI models perceive your brand</p>
+          <Button onClick={handleRunAnalysis} disabled={isRunningAnalysis} className="bg-blue-500 hover:bg-blue-600">
             {isRunningAnalysis ? "Running..." : "Run Analysis"}
           </Button>
         </CardContent>
