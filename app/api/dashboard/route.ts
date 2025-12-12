@@ -31,6 +31,7 @@ export async function GET() {
         hasConfig: false,
         brand: null,
         latestReport: null,
+        latestAnalysis: null,
         recentAlerts: [],
         analysisHistory: [],
         competitors: [],
@@ -122,6 +123,26 @@ export async function GET() {
       competitor_scores: report.threats || [],
     }))
 
+    const latestAnalysis = latestReport
+      ? {
+          summary: latestReport.narrative_analysis?.summary || "",
+          strengths: latestReport.narrative_analysis?.strengths || [],
+          weaknesses: latestReport.narrative_analysis?.weaknesses || [],
+          opportunities: latestReport.narrative_analysis?.opportunities || [],
+          threats: latestReport.narrative_analysis?.threats || [],
+          competitorScores: (latestReport.threats || []).map((t: any) => ({
+            name: t.competitor || t.name || "Unknown",
+            score: t.score || 0,
+            shareOfVoice: t.shareOfVoice || 0,
+          })),
+          modelBreakdown: (dimensionalScores.modelBreakdown || []).map((m: any) => ({
+            model: m.model || "Unknown",
+            score: m.score || 0,
+            sentiment: m.sentiment || "neutral",
+          })),
+        }
+      : null
+
     return NextResponse.json({
       hasConfig: true,
       brand: {
@@ -144,6 +165,7 @@ export async function GET() {
             brand: latestReport.brand_name,
           }
         : null,
+      latestAnalysis,
       recentAlerts: recentAlerts || [],
       analysisHistory: transformedHistory,
       competitors,
