@@ -99,6 +99,10 @@ ${mockReport.actionPlan90_30_7.sevenDays.map((s) => `• ${s}`).join("\n")}`
             This is a sample executive-style report using example data only. Your real reports will use live AI
             visibility scans.
           </p>
+          <p className="text-xs text-zinc-500 mt-2">
+            This is a static example using demo data. Future reports will use live AI visibility scans from your
+            workspace.
+          </p>
         </div>
         <Button variant="outline" onClick={() => router.push("/dashboard/reports")}>
           Back to Reports

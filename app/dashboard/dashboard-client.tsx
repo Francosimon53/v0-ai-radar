@@ -88,37 +88,16 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
   }
 
   async function handleRunAnalysis() {
-    if (!dashboardData?.configId) return
+    if (isRunning) return
 
-    try {
-      setRunError(null)
-      setIsRunning(true)
-      console.log("[v0] Starting analysis for config:", dashboardData.configId)
+    setRunError(null)
+    setIsRunning(true)
 
-      const response = await fetch("/api/analysis/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ configId: dashboardData.configId }),
-      })
-
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => null)
-        console.error("[v0] Run analysis failed:", response.status, errorBody)
-        setRunError(errorBody?.error || errorBody?.message || "Analysis failed. Please try again.")
-        return
-      }
-
-      const result = await response.json()
-      console.log("[v0] Run analysis succeeded:", result)
-
-      router.refresh()
-      await loadDashboard()
-    } catch (err) {
-      console.error("[v0] Run analysis error:", err)
-      setRunError("Unexpected error while running analysis.")
-    } finally {
+    // Simulate analysis delay (no backend call)
+    setTimeout(() => {
       setIsRunning(false)
-    }
+      router.push("/dashboard/reports/sample")
+    }, 2000)
   }
 
   if (loading) {
@@ -192,8 +171,9 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
             </Button>
           </div>
           {runError && <p className="mt-3 text-sm text-red-400">{runError}</p>}
-          <p className="text-xs text-zinc-500 mt-2">
-            You can preview a full VIP-style report using sample data while your first live analysis is being set up.
+          <p className="text-xs text-zinc-500 mt-4">
+            Preview mode – this analysis uses example data only. Your workspace admin can enable live AI scans in the
+            full version.
           </p>
         </div>
       </div>
