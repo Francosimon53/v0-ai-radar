@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { FileText, Calendar, Download, ExternalLink, Loader2, TrendingUp, ChevronRight } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { VIPReportModal } from "@/components/vip-report-modal"
 
 interface Report {
   id: string
@@ -26,6 +27,7 @@ export default function ReportsClient() {
   const [reports, setReports] = useState<Report[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
+  const [isVIPModalOpen, setIsVIPModalOpen] = useState(false)
 
   useEffect(() => {
     loadReports()
@@ -78,13 +80,15 @@ export default function ReportsClient() {
   if (reports.length === 0) {
     return (
       <div className="space-y-6">
-        {/* Header */}
+        <VIPReportModal isOpen={isVIPModalOpen} onClose={() => setIsVIPModalOpen(false)} />
+
         <div>
-          <h1 className="text-3xl font-bold text-white">Reports</h1>
-          <p className="text-zinc-400 mt-1">Review your past AI visibility scans and executive summaries.</p>
+          <h1 className="text-3xl font-bold text-white">Client-ready AI reports</h1>
+          <p className="text-zinc-400 mt-1">
+            Run your first AI analysis to generate a board-ready report you can send to your clients.
+          </p>
         </div>
 
-        {/* Empty State Card */}
         <Card className="border-dashed border-zinc-700 bg-zinc-900/50">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <div className="h-16 w-16 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-6">
@@ -95,16 +99,56 @@ export default function ReportsClient() {
               Run your first analysis from the dashboard to generate your first executive report.
             </p>
             <Button onClick={() => router.push("/dashboard")} size="lg" className="bg-blue-600 hover:bg-blue-700">
-              Go to Dashboard
+              Generate my first VIP report
             </Button>
           </CardContent>
         </Card>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card
+            className="border-zinc-700 bg-zinc-900/50 cursor-pointer hover:border-zinc-600 transition-colors"
+            onClick={() => setIsVIPModalOpen(true)}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="font-semibold text-white">Nike – Global campaign pitch</h3>
+                  <p className="text-sm text-zinc-400 mt-1">
+                    Example of a full VIP AI brand report for a global client.
+                  </p>
+                </div>
+                <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20">Sample</Badge>
+              </div>
+              <p className="text-xs text-zinc-500">Click to preview</p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="border-zinc-700 bg-zinc-900/50 cursor-pointer hover:border-zinc-600 transition-colors"
+            onClick={() => setIsVIPModalOpen(true)}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="font-semibold text-white">Apple – Q4 AI visibility review</h3>
+                  <p className="text-sm text-zinc-400 mt-1">
+                    Example quarterly review format with SWOT and competitor ranking.
+                  </p>
+                </div>
+                <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20">Sample</Badge>
+              </div>
+              <p className="text-xs text-zinc-500">Click to preview</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
+      <VIPReportModal isOpen={isVIPModalOpen} onClose={() => setIsVIPModalOpen(false)} />
+
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white">Reports</h1>
@@ -117,7 +161,6 @@ export default function ReportsClient() {
       </div>
 
       <div className="grid lg:grid-cols-12 gap-6">
-        {/* Left Column: Report History */}
         <div className="lg:col-span-4 space-y-4">
           <Card className="bg-zinc-900 border-zinc-800">
             <CardContent className="p-4">
@@ -156,7 +199,6 @@ export default function ReportsClient() {
           </Card>
         </div>
 
-        {/* Right Column: Executive Summary */}
         {selectedReport && (
           <div className="lg:col-span-8 space-y-6">
             <Card className="bg-zinc-900 border-zinc-800">
@@ -180,7 +222,6 @@ export default function ReportsClient() {
                   {getSentimentBadge(selectedReport.sentiment)}
                 </div>
 
-                {/* Summary Text */}
                 {selectedReport.summary && (
                   <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700/50 mb-6">
                     <p className="text-zinc-300 leading-relaxed">{selectedReport.summary}</p>
@@ -204,7 +245,6 @@ export default function ReportsClient() {
               </CardContent>
             </Card>
 
-            {/* SWOT Snapshot */}
             {(selectedReport.strengths?.length > 0 ||
               selectedReport.weaknesses?.length > 0 ||
               selectedReport.opportunities?.length > 0 ||

@@ -1,6 +1,6 @@
 "use client"
 
-// v3.0 - Force new deployment with cache bust
+// v4.0 - Premium UX upgrade
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
   Loader2,
-  TrendingUp,
   Target,
   Users,
   BarChart3,
@@ -22,6 +21,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { VIPReportModal } from "@/components/vip-report-modal"
 
 interface DashboardData {
   hasConfig: boolean
@@ -59,6 +59,7 @@ export default function DashboardClient() {
   const [loading, setLoading] = useState(true)
   const [isRunning, setIsRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
+  const [isVIPModalOpen, setIsVIPModalOpen] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -142,12 +143,64 @@ export default function DashboardClient() {
 
   return (
     <div className="space-y-8">
+      <VIPReportModal isOpen={isVIPModalOpen} onClose={() => setIsVIPModalOpen(false)} />
+
       <div className="fixed bottom-4 right-4 z-50 rounded-md bg-zinc-900 px-3 py-1.5 text-xs text-zinc-500 border border-zinc-800">
-        v3.0
+        v4.0
+      </div>
+
+      <div className="rounded-xl border border-blue-500/20 bg-gradient-to-br from-blue-950/30 via-zinc-900 to-zinc-950 p-8">
+        <div className="max-w-3xl">
+          <h1 className="text-3xl font-bold tracking-tight text-white mb-3">
+            See how AI recommends your brand in under 60 seconds
+          </h1>
+          <p className="text-lg text-zinc-400 mb-6">
+            Connect your brand, add competitors and let AI run a full SWOT & ranking analysis for you and your clients.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={handleRunAnalysis}
+              disabled={isRunning}
+              size="lg"
+              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+            >
+              {isRunning ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Running Analysis...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Run first analysis
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setIsVIPModalOpen(true)}
+              className="border-zinc-700 hover:bg-zinc-800 bg-transparent"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Preview VIP AI brand report
+            </Button>
+          </div>
+          {runError && <p className="mt-3 text-sm text-red-400">{runError}</p>}
+        </div>
       </div>
 
       {isFirstTime && (
-        <Card className="border-blue-500/20 bg-gradient-to-br from-blue-950/20 via-zinc-900 to-zinc-950">
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+          <p className="text-sm text-amber-300">
+            <strong>No AI analysis yet.</strong> Run your first scan to unlock SWOT, competitor rankings and VIP
+            reports.
+          </p>
+        </div>
+      )}
+
+      {isFirstTime && (
+        <Card className="border-zinc-800 bg-zinc-900">
           <CardHeader>
             <CardTitle className="text-2xl text-white">Get your first AI brand report in 3 steps</CardTitle>
           </CardHeader>
@@ -161,7 +214,7 @@ export default function DashboardClient() {
                   </div>
                   <h3 className="font-semibold text-white">Confirm your brand & industry</h3>
                 </div>
-                <p className="mb-4 text-sm text-zinc-400">We use this to understand your AI context.</p>
+                <p className="mb-4 text-sm text-zinc-400">Tell us who you are so we can scan the right AI contexts.</p>
                 <Button
                   variant="outline"
                   size="sm"
@@ -181,7 +234,7 @@ export default function DashboardClient() {
                   <h3 className="font-semibold text-white">Add competitors</h3>
                   {metrics.competitorsCount > 0 && <CheckCircle2 className="h-4 w-4 text-green-500" />}
                 </div>
-                <p className="mb-4 text-sm text-zinc-400">Tell us who to compare you against.</p>
+                <p className="mb-4 text-sm text-zinc-400">Add the 3–7 brands your clients worry about the most.</p>
                 <Button
                   variant="outline"
                   size="sm"
@@ -200,7 +253,9 @@ export default function DashboardClient() {
                   </div>
                   <h3 className="font-semibold text-white">Run your first AI analysis</h3>
                 </div>
-                <p className="mb-4 text-sm text-zinc-400">We scan how AI assistants see and recommend your brand.</p>
+                <p className="mb-4 text-sm text-zinc-400">
+                  We ask AI assistants how they see and recommend your brand.
+                </p>
                 <Button
                   onClick={handleRunAnalysis}
                   disabled={isRunning}
@@ -223,103 +278,19 @@ export default function DashboardClient() {
         </Card>
       )}
 
-      {/* ZONE 1: HERO SECTION - "How AI sees your brand" */}
-      <div className="rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 p-8">
-        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-4">
-            <h1 className="text-3xl font-bold tracking-tight">How AI sees {brand?.name}</h1>
-            <p className="text-zinc-400 max-w-xl">
-              {latestAnalysis?.summary ||
-                "Run your first analysis to see how AI models perceive and recommend your brand."}
-            </p>
-            <div className="flex flex-wrap gap-3 pt-2">
-              <Button
-                onClick={handleRunAnalysis}
-                disabled={isRunning}
-                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
-              >
-                {isRunning ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Running Analysis...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Run Analysis
-                  </>
-                )}
-              </Button>
-              <Link href="/dashboard/reports/vip-demo">
-                <Button variant="outline" className="border-zinc-700 hover:bg-zinc-800 bg-transparent">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Preview VIP AI Brand Report
-                </Button>
-              </Link>
-            </div>
-            {runError && <p className="text-sm text-red-400">{runError}</p>}
-          </div>
-
-          {/* Right side: Quick stats + Run button */}
-          <div className="flex flex-col items-end gap-4 lg:min-w-[240px]">
-            <div className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm text-zinc-400">Rank</span>
-                <span className="text-3xl font-bold text-white">#{brand?.rank || 1}</span>
-              </div>
-              <p className="text-xs text-zinc-500">of {brand?.totalCompetitors || 1} competitors</p>
-
-              <div className="mt-4 pt-4 border-t border-zinc-800">
-                <p className="text-xs text-zinc-400">Last updated</p>
-                <p className="mt-1 text-sm font-medium text-white">{brand?.lastUpdated || "Never"}</p>
-              </div>
-            </div>
-
-            <Button
-              onClick={handleRunAnalysis}
-              disabled={isRunning}
-              className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold"
-              size="lg"
-            >
-              {isRunning ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Running Analysis...
-                </>
-              ) : (
-                <>
-                  <TrendingUp className="mr-2 h-4 w-4" />
-                  Run Analysis
-                </>
-              )}
-            </Button>
-            {runError && <p className="mt-2 text-sm text-red-400 text-center">{runError}</p>}
-          </div>
-        </div>
-      </div>
-
-      {/* Placeholder preview card to explain what appears after first analysis */}
-      <Card className="mt-8 border-zinc-800 bg-zinc-900">
+      <Card className="border-zinc-800 bg-zinc-900">
         <CardHeader>
           <CardTitle className="text-xl text-white">Next: AI SWOT & competitor insights</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-zinc-300">
-          <p>
-            After your first AI analysis, this area will transform into a premium consulting-style view of your
-            brand&apos;s AI presence.
-          </p>
-          <ul className="list-disc list-inside space-y-1">
-            <li>AI SWOT snapshot of strengths, weaknesses, opportunities and threats.</li>
+        <CardContent className="space-y-3 text-sm text-zinc-300">
+          <ul className="list-disc list-inside space-y-2">
+            <li>Board-ready AI SWOT: strengths, weaknesses, opportunities and threats.</li>
             <li>Side-by-side competitor comparison based on AI scores and share of voice.</li>
             <li>Breakdown of how different AI models describe and rank your brand.</li>
           </ul>
-          <p className="text-zinc-400">
-            For now, this is a preview of what you and your clients will see once the first analysis has been generated.
-          </p>
         </CardContent>
       </Card>
 
-      {/* ZONE 2: KPI CARDS ROW */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="border-zinc-800 bg-zinc-900">
           <CardContent className="p-6">
@@ -382,7 +353,6 @@ export default function DashboardClient() {
         </Card>
       </div>
 
-      {/* ZONE 3: AI SWOT SNAPSHOT */}
       <div>
         <h2 className="mb-4 text-2xl font-bold text-white">AI SWOT Snapshot</h2>
         <div className="grid gap-4 md:grid-cols-2">
@@ -407,9 +377,7 @@ export default function DashboardClient() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-zinc-500 italic">
-                  Your strengths will appear here after your first AI analysis.
-                </p>
+                <p className="text-sm text-zinc-500 italic">Strong brand awareness in AI assistants (sample).</p>
               )}
             </CardContent>
           </Card>
@@ -435,9 +403,7 @@ export default function DashboardClient() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-zinc-500 italic">
-                  Your weaknesses will appear here after your first AI analysis.
-                </p>
+                <p className="text-sm text-zinc-500 italic">Limited presence in Spanish-speaking queries (sample).</p>
               )}
             </CardContent>
           </Card>
@@ -463,9 +429,7 @@ export default function DashboardClient() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-zinc-500 italic">
-                  Your opportunities will appear here after your first AI analysis.
-                </p>
+                <p className="text-sm text-zinc-500 italic">Growing demand for AI-ready customer journeys (sample).</p>
               )}
             </CardContent>
           </Card>
@@ -492,7 +456,7 @@ export default function DashboardClient() {
                 </ul>
               ) : (
                 <p className="text-sm text-zinc-500 italic">
-                  Your threats will appear here after your first AI analysis.
+                  Competitors being recommended more often for key use cases (sample).
                 </p>
               )}
             </CardContent>
@@ -500,7 +464,6 @@ export default function DashboardClient() {
         </div>
       </div>
 
-      {/* ZONE 4: COMPETITORS & AI MODELS */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left: Competitor Comparison */}
         <Card className="border-zinc-800 bg-zinc-900">
