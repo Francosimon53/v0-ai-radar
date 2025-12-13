@@ -1,13 +1,26 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { TrendingUp, TrendingDown, Minus, Plus, Building2, Users, Trash2, Loader2, Radar } from "lucide-react"
+import {
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Plus,
+  Building2,
+  Users,
+  Trash2,
+  Loader2,
+  Radar,
+  Target,
+  BarChart3,
+  Trophy,
+} from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 
@@ -47,7 +60,21 @@ export default function CompetitorsClient() {
   const [newCompetitorName, setNewCompetitorName] = useState("")
   const [addingCompetitor, setAddingCompetitor] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [threatFilter, setThreatFilter] = useState<"all" | "low" | "medium" | "high">("all")
   const { toast } = useToast()
+
+  const summaryStats = useMemo(() => {
+    if (competitors.length === 0) return null
+    const totalCompetitors = competitors.length
+    const avgScore = Math.round(competitors.reduce((sum, c) => sum + c.score, 0) / competitors.length)
+    const topCompetitor = competitors.reduce((top, c) => (c.score > (top?.score || 0) ? c : top), competitors[0])
+    return { totalCompetitors, avgScore, topCompetitor }
+  }, [competitors])
+
+  const filteredCompetitors = useMemo(() => {
+    if (threatFilter === "all") return competitors
+    return competitors.filter((c) => c.threatLevel === threatFilter)
+  }, [competitors, threatFilter])
 
   useEffect(() => {
     async function fetchCompetitors() {
@@ -208,7 +235,97 @@ export default function CompetitorsClient() {
         </div>
       </div>
 
-      {/* Competitors Grid or Empty State */}
+      {summaryStats && (
+        <Card className="bg-zinc-900/50 border-zinc-800">
+          <CardContent className="py-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="grid grid-cols-3 gap-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <Target className="h-4 w-4 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Tracked</p>
+                    <p className="text-sm font-semibold text-white">{summaryStats.totalCompetitors} competitors</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <BarChart3 className="h-4 w-4 text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Avg AI Score</p>
+                    <p className="text-sm font-semibold text-white">{summaryStats.avgScore}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-red-500/10 flex items-center justify-center">
+                    <Trophy className="h-4 w-4 text-red-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Top Rival</p>
+                    <p className="text-sm font-semibold text-white">
+                      {summaryStats.topCompetitor.name} ({summaryStats.topCompetitor.score})
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 justify-start md:justify-end">
+                <Button
+                  size="sm"
+                  variant={threatFilter === "all" ? "default" : "outline"}
+                  onClick={() => setThreatFilter("all")}
+                  className={
+                    threatFilter === "all"
+                      ? "bg-blue-600 hover:bg-blue-700 text-white"
+                      : "border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600"
+                  }
+                >
+                  All
+                </Button>
+                <Button
+                  size="sm"
+                  variant={threatFilter === "low" ? "default" : "outline"}
+                  onClick={() => setThreatFilter("low")}
+                  className={
+                    threatFilter === "low"
+                      ? "bg-green-600 hover:bg-green-700 text-white"
+                      : "border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600"
+                  }
+                >
+                  Low threat
+                </Button>
+                <Button
+                  size="sm"
+                  variant={threatFilter === "medium" ? "default" : "outline"}
+                  onClick={() => setThreatFilter("medium")}
+                  className={
+                    threatFilter === "medium"
+                      ? "bg-amber-600 hover:bg-amber-700 text-white"
+                      : "border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600"
+                  }
+                >
+                  Medium threat
+                </Button>
+                <Button
+                  size="sm"
+                  variant={threatFilter === "high" ? "default" : "outline"}
+                  onClick={() => setThreatFilter("high")}
+                  className={
+                    threatFilter === "high"
+                      ? "bg-red-600 hover:bg-red-700 text-white"
+                      : "border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600"
+                  }
+                >
+                  High threat
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {competitors.length === 0 ? (
         <Card className="bg-zinc-900 border-zinc-800">
           <CardContent className="flex flex-col items-center justify-center py-16">
@@ -225,9 +342,22 @@ export default function CompetitorsClient() {
             </Button>
           </CardContent>
         </Card>
+      ) : filteredCompetitors.length === 0 ? (
+        <Card className="bg-zinc-900 border-zinc-800">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <p className="text-zinc-400 text-center">No competitors match the "{threatFilter}" threat filter.</p>
+            <Button
+              variant="ghost"
+              onClick={() => setThreatFilter("all")}
+              className="mt-4 text-blue-400 hover:text-blue-300"
+            >
+              Show all competitors
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {competitors.map((competitor) => {
+          {filteredCompetitors.map((competitor) => {
             const threatBadge = getThreatBadgeProps(competitor.threatLevel)
             return (
               <Card key={competitor.id} className="bg-zinc-900 border-zinc-800 hover:border-zinc-700 transition-colors">
@@ -300,7 +430,6 @@ export default function CompetitorsClient() {
         </div>
       )}
 
-      {/* Add Competitor Dialog - unchanged behavior */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="bg-zinc-900 border-zinc-800">
           <DialogHeader>
