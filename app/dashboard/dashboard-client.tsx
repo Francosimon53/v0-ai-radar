@@ -21,7 +21,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { VIPReportModal } from "@/components/vip-report-modal"
+// import { VIPReportModal } from "@/components/vip-report-modal"
 
 interface DashboardData {
   hasConfig: boolean
@@ -54,17 +54,22 @@ interface DashboardData {
   configId: string | null
 }
 
-export default function DashboardClient() {
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
+interface DashboardClientProps {
+  initialData: DashboardData | null
+}
+
+export default function DashboardClient({ initialData }: DashboardClientProps) {
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(initialData)
+  const [loading, setLoading] = useState(!initialData)
   const [isRunning, setIsRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
-  const [isVIPModalOpen, setIsVIPModalOpen] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    loadDashboard()
-  }, [])
+    if (!initialData) {
+      loadDashboard()
+    }
+  }, [initialData])
 
   async function loadDashboard() {
     try {
@@ -143,7 +148,7 @@ export default function DashboardClient() {
 
   return (
     <div className="space-y-8">
-      <VIPReportModal isOpen={isVIPModalOpen} onClose={() => setIsVIPModalOpen(false)} />
+      {/* <VIPReportModal isOpen={isVIPModalOpen} onClose={() => setIsVIPModalOpen(false)} /> */}
 
       <div className="fixed bottom-4 right-4 z-50 rounded-md bg-zinc-900 px-3 py-1.5 text-xs text-zinc-500 border border-zinc-800">
         v4.0
@@ -179,7 +184,7 @@ export default function DashboardClient() {
             <Button
               variant="outline"
               size="lg"
-              onClick={() => setIsVIPModalOpen(true)}
+              onClick={() => router.push("/dashboard/reports/sample")}
               className="border-zinc-700 hover:bg-zinc-800 bg-transparent"
             >
               <FileText className="mr-2 h-4 w-4" />
