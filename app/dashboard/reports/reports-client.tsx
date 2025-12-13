@@ -1,14 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { useState, useEffect, useMemo } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   FileText,
-  Calendar,
   Loader2,
-  TrendingUp,
   ChevronRight,
   AlertCircle,
   BarChart3,
@@ -16,6 +14,12 @@ import {
   Cpu,
   Sparkles,
   RefreshCw,
+  Download,
+  ExternalLink,
+  CheckCircle,
+  XCircle,
+  Lightbulb,
+  ShieldAlert,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -30,6 +34,10 @@ type ReportItem = {
   summary: string
   shareOfVoice: number
   modelsQueried: string[]
+  strengths?: string[]
+  weaknesses?: string[]
+  opportunities?: string[]
+  threats?: string[]
 }
 
 function mapApiToReportItem(apiReport: any): ReportItem {
@@ -44,6 +52,10 @@ function mapApiToReportItem(apiReport: any): ReportItem {
     summary: apiReport.summary || "",
     shareOfVoice: apiReport.shareOfVoice || 0,
     modelsQueried: apiReport.modelsQueried || [],
+    strengths: apiReport.strengths || [],
+    weaknesses: apiReport.weaknesses || [],
+    opportunities: apiReport.opportunities || [],
+    threats: apiReport.threats || [],
   }
 }
 
@@ -52,7 +64,18 @@ export default function ReportsClient() {
   const [reports, setReports] = useState<ReportItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null)
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
+
+  const sortedReports = useMemo(() => {
+    return [...reports].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  }, [reports])
+
+  const selectedReport = useMemo(() => {
+    if (!selectedReportId && sortedReports.length > 0) {
+      return sortedReports[0]
+    }
+    return sortedReports.find((r) => r.id === selectedReportId) || null
+  }, [sortedReports, selectedReportId])
 
   useEffect(() => {
     loadReports()
@@ -70,7 +93,7 @@ export default function ReportsClient() {
       const mapped = (data.reports || []).map(mapApiToReportItem)
       setReports(mapped)
       if (mapped.length > 0) {
-        setSelectedReport(mapped[0])
+        setSelectedReportId(mapped[0].id)
       }
     } catch (err) {
       console.error("Failed to load reports:", err)
@@ -100,14 +123,13 @@ export default function ReportsClient() {
 
   if (isLoading) {
     return (
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] mt-8">
         <div className="space-y-4">
-          <div>
-            <div className="h-8 w-48 bg-zinc-800 rounded animate-pulse mb-2" />
-            <div className="h-4 w-64 bg-zinc-800/50 rounded animate-pulse" />
-          </div>
           <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="p-4 space-y-3">
+            <CardHeader className="pb-3">
+              <div className="h-6 w-40 bg-zinc-800 rounded animate-pulse" />
+            </CardHeader>
+            <CardContent className="space-y-3">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="p-4 bg-zinc-800/50 rounded-lg animate-pulse">
                   <div className="h-5 w-32 bg-zinc-700 rounded mb-2" />
@@ -117,7 +139,7 @@ export default function ReportsClient() {
             </CardContent>
           </Card>
         </div>
-        <div className="flex items-center justify-center min-h-[300px]">
+        <div className="flex items-center justify-center min-h-[400px]">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
             <p className="text-zinc-400 text-sm">Loading reports...</p>
@@ -170,73 +192,52 @@ export default function ReportsClient() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] mt-8">
       {/* Left column - Report list */}
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">AI Visibility Reports</h1>
-          <p className="text-zinc-400 text-sm mt-1">
-            Review your past AI scans, executive summaries, and score changes.
-          </p>
-        </div>
-
-        {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-500" />
-              <span className="text-sm text-red-400">{error}</span>
+      <Card className="bg-zinc-900 border-zinc-800 h-fit">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-semibold text-white">AI Brand Reports</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-500" />
+                <span className="text-sm text-red-400">{error}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={loadReports}
+                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={loadReports}
-              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+          )}
+
+          {sortedReports.map((report) => (
+            <div
+              key={report.id}
+              onClick={() => setSelectedReportId(report.id)}
+              data-active={selectedReport?.id === report.id}
+              className="rounded-lg px-3 py-3 cursor-pointer hover:bg-zinc-900/60 data-[active=true]:bg-zinc-800 border border-transparent data-[active=true]:border-zinc-700 transition-all"
             >
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Retry
-            </Button>
-          </div>
-        )}
-
-        <Card className="bg-zinc-900 border-zinc-800">
-          <CardContent className="p-4">
-            <div className="space-y-2">
-              {reports.map((report) => (
-                <div
-                  key={report.id}
-                  onClick={() => setSelectedReport(report)}
-                  className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                    selectedReport?.id === report.id
-                      ? "bg-blue-500/10 border-blue-500/50"
-                      : "bg-zinc-800/50 border-zinc-700/50 hover:border-zinc-600"
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-white truncate">
-                        {report.brandName}
-                        {report.configName && <span className="text-zinc-400 font-normal"> – {report.configName}</span>}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-zinc-400">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(report.createdAt)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {getStatusBadge(report.status)}
-                    {report.overallScore !== null && (
-                      <Badge className="bg-zinc-700/50 text-zinc-300 border-zinc-600">
-                        AI Score {report.overallScore}/100
-                      </Badge>
-                    )}
-                  </div>
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-white truncate">{report.brandName}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">{formatDate(report.createdAt)}</p>
                 </div>
-              ))}
+                {report.overallScore !== null && (
+                  <Badge variant="secondary" className="bg-zinc-700 text-zinc-200 ml-2 shrink-0">
+                    {report.overallScore}/100
+                  </Badge>
+                )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          ))}
+        </CardContent>
+      </Card>
 
       {/* Right column - Report detail */}
       <div className="space-y-4">
@@ -251,41 +252,22 @@ export default function ReportsClient() {
           </Card>
         ) : (
           <>
+            {/* Header Card */}
             <Card className="bg-zinc-900 border-zinc-800">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h2 className="text-xl font-bold text-white mb-1">
-                      {selectedReport.brandName}
-                      {selectedReport.configName && (
-                        <span className="text-zinc-400 font-normal"> – {selectedReport.configName}</span>
-                      )}
+                      AI visibility report for {selectedReport.brandName}
                     </h2>
-                    <div className="flex items-center gap-4 text-sm text-zinc-400">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {formatDate(selectedReport.createdAt)}
-                      </span>
-                      {selectedReport.overallScore !== null && (
-                        <span className="flex items-center gap-1">
-                          <TrendingUp className="h-4 w-4" />
-                          Score: {selectedReport.overallScore}/100
-                        </span>
-                      )}
-                    </div>
+                    <p className="text-sm text-zinc-400">Generated on {formatDate(selectedReport.createdAt)}</p>
                   </div>
                   {getStatusBadge(selectedReport.status)}
-                </div>
-
-                <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-                  <p className="text-zinc-300 leading-relaxed">
-                    {selectedReport.summary ||
-                      "This is where your AI executive summary will appear once the first report has been generated."}
-                  </p>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Top Metrics Row */}
             <div className="grid gap-4 sm:grid-cols-3">
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardContent className="p-4">
@@ -326,7 +308,7 @@ export default function ReportsClient() {
                       <Cpu className="h-5 w-5 text-purple-500" />
                     </div>
                     <div>
-                      <p className="text-xs text-zinc-400 uppercase tracking-wide">Models Queried</p>
+                      <p className="text-xs text-zinc-400 uppercase tracking-wide">Competitors Scanned</p>
                       <p className="text-xl font-bold text-white">{selectedReport.modelsQueried?.length || "—"}</p>
                     </div>
                   </div>
@@ -334,13 +316,138 @@ export default function ReportsClient() {
               </Card>
             </div>
 
-            <Button
-              onClick={() => router.push(`/dashboard/reports/${selectedReport.id}`)}
-              className="w-full bg-blue-600 hover:bg-blue-700"
-            >
-              View Full Report
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
+            {/* Executive Summary */}
+            <Card className="bg-zinc-900 border-zinc-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold text-white">Executive summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-zinc-300 leading-relaxed">
+                  {selectedReport.summary ||
+                    "This is a placeholder executive summary. Once the first real report is generated, your client will see a concise overview of AI strengths, risks, and next actions here."}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* SWOT Preview */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Card className="bg-zinc-900 border-zinc-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-green-400 flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    Strengths
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {selectedReport.strengths && selectedReport.strengths.length > 0 ? (
+                    <ul className="text-sm text-zinc-300 space-y-1">
+                      {selectedReport.strengths.slice(0, 3).map((s, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-green-500 mt-1">•</span>
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-zinc-500 italic">Will appear after your first full AI scan.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="bg-zinc-900 border-zinc-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-yellow-400 flex items-center gap-2">
+                    <XCircle className="h-4 w-4" />
+                    Weaknesses
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {selectedReport.weaknesses && selectedReport.weaknesses.length > 0 ? (
+                    <ul className="text-sm text-zinc-300 space-y-1">
+                      {selectedReport.weaknesses.slice(0, 3).map((w, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-yellow-500 mt-1">•</span>
+                          <span>{w}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-zinc-500 italic">Will appear after your first full AI scan.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="bg-zinc-900 border-zinc-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-blue-400 flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4" />
+                    Opportunities
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {selectedReport.opportunities && selectedReport.opportunities.length > 0 ? (
+                    <ul className="text-sm text-zinc-300 space-y-1">
+                      {selectedReport.opportunities.slice(0, 3).map((o, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-blue-500 mt-1">•</span>
+                          <span>{o}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-zinc-500 italic">Will appear after your first full AI scan.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="bg-zinc-900 border-zinc-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-red-400 flex items-center gap-2">
+                    <ShieldAlert className="h-4 w-4" />
+                    Threats
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {selectedReport.threats && selectedReport.threats.length > 0 ? (
+                    <ul className="text-sm text-zinc-300 space-y-1">
+                      {selectedReport.threats.slice(0, 3).map((t, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-red-500 mt-1">•</span>
+                          <span>{t}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-zinc-500 italic">Will appear after your first full AI scan.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* CTA Row */}
+            <Card className="bg-zinc-900 border-zinc-800">
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <p className="text-sm text-zinc-400">Ready for clients</p>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 bg-transparent"
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Download PDF
+                    </Button>
+                    <Button
+                      onClick={() => router.push(`/dashboard/reports/${selectedReport.id}`)}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open full report
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
