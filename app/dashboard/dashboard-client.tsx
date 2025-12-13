@@ -22,6 +22,7 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 // import { VIPReportModal } from "@/components/vip-report-modal"
+import { runBrandAnalysis } from "@/lib/analysis/run-brand-analysis"
 
 interface DashboardData {
   hasConfig: boolean
@@ -94,28 +95,13 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
     setIsRunning(true)
 
     try {
-      const res = await fetch("/api/analysis/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ configId: dashboardData?.configId || "current" }),
-      })
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: "Analysis failed" }))
-        throw new Error(errorData.error || "Analysis failed")
-      }
-
-      const data = await res.json()
+      const result = await runBrandAnalysis(dashboardData?.configId)
 
       // Refresh dashboard metrics
       router.refresh()
 
       // Navigate to the new report
-      if (data.analysisId) {
-        router.push(`/dashboard/reports/${data.analysisId}`)
-      } else {
-        router.push("/dashboard/reports")
-      }
+      router.push(`/dashboard/reports/${result.analysisId}`)
     } catch (error) {
       console.error("[v0] Run analysis error:", error)
       setRunError(error instanceof Error ? error.message : "Analysis failed. Please try again.")

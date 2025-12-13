@@ -23,6 +23,7 @@ import {
   Eye,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { runBrandAnalysis } from "@/lib/analysis/run-brand-analysis"
 
 type ReportItem = {
   id: string
@@ -66,6 +67,8 @@ export default function ReportsClient() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
+  const [isRunningAnalysis, setIsRunningAnalysis] = useState(false)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
 
   const sortedReports = useMemo(() => {
     return [...reports].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -120,6 +123,24 @@ export default function ReportsClient() {
       return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Processing</Badge>
     }
     return <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Failed</Badge>
+  }
+
+  async function handleRunFirstAnalysis() {
+    if (isRunningAnalysis) return
+
+    setAnalysisError(null)
+    setIsRunningAnalysis(true)
+
+    try {
+      const result = await runBrandAnalysis()
+
+      // Navigate to the new report
+      router.push(`/dashboard/reports/${result.analysisId}`)
+    } catch (error) {
+      console.error("Failed to run analysis from Reports page:", error)
+      setAnalysisError(error instanceof Error ? error.message : "Analysis failed. Please try again.")
+      setIsRunningAnalysis(false)
+    }
   }
 
   if (isLoading) {
@@ -178,20 +199,36 @@ export default function ReportsClient() {
                 <span>90 / 30 / 7-day action plan for your next campaigns.</span>
               </li>
             </ul>
+            {analysisError && (
+              <div className="w-full mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <p className="text-sm text-red-400">{analysisError}</p>
+              </div>
+            )}
             <div className="flex flex-col items-center gap-3 w-full">
               <Button
-                onClick={() => router.push("/dashboard")}
+                onClick={handleRunFirstAnalysis}
+                disabled={isRunningAnalysis}
                 size="lg"
                 className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
               >
-                <Sparkles className="mr-2 h-4 w-4" />
-                Run first analysis
+                {isRunningAnalysis ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Running analysis...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Run first analysis
+                  </>
+                )}
               </Button>
               <Button
                 onClick={() => router.push("/dashboard/reports/sample")}
                 variant="ghost"
                 size="sm"
                 className="text-zinc-400 hover:text-white"
+                disabled={isRunningAnalysis}
               >
                 <Eye className="mr-2 h-4 w-4" />
                 Preview sample VIP report
