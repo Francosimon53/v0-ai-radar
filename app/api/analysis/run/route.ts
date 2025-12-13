@@ -94,7 +94,6 @@ export async function POST(request: NextRequest) {
     // Save to database
     console.log("[v0] Saving report to database...")
     const reportData = {
-      id: result.id,
       user_id: user.id,
       config_id: config.id,
       brand_name: brandName,
@@ -141,26 +140,39 @@ export async function POST(request: NextRequest) {
       created_at: result.timestamp,
     }
 
-    const { error: saveError } = await supabase.from("reports").insert(reportData)
+    const { data: insertedReport, error: saveError } = await supabase
+      .from("reports")
+      .insert(reportData)
+      .select("id")
+      .single()
+
+    let reportId: string | null = null
 
     if (saveError) {
       console.error("[v0] Save report FAILED:", saveError.message, saveError.details)
       // Try minimal save
-      const { error: minimalError } = await supabase.from("reports").insert({
-        user_id: user.id,
-        config_id: config.id,
-        brand_name: brandName,
-        overall_score: result.brandScore,
-        status: "completed",
-        created_at: result.timestamp,
-      })
+      const { data: minimalReport, error: minimalError } = await supabase
+        .from("reports")
+        .insert({
+          user_id: user.id,
+          config_id: config.id,
+          brand_name: brandName,
+          overall_score: result.brandScore,
+          status: "completed",
+          created_at: result.timestamp,
+        })
+        .select("id")
+        .single()
+
       if (minimalError) {
         console.error("[v0] Minimal save ALSO FAILED:", minimalError.message)
       } else {
-        console.log("[v0] Minimal save succeeded")
+        console.log("[v0] Minimal save succeeded with ID:", minimalReport?.id)
+        reportId = minimalReport?.id
       }
     } else {
-      console.log("[v0] Report saved successfully")
+      console.log("[v0] Report saved successfully with ID:", insertedReport?.id)
+      reportId = insertedReport?.id
     }
 
     // Update last run timestamp
@@ -168,7 +180,7 @@ export async function POST(request: NextRequest) {
 
     const response = {
       success: true,
-      analysisId: result.id,
+      analysisId: reportId,
       brandScore: result.brandScore,
       shareOfVoice: result.shareOfVoice,
       sentiment: result.sentiment,
@@ -184,7 +196,7 @@ export async function POST(request: NextRequest) {
         : null,
     }
 
-    console.log("[v0] Returning success response - brandScore:", response.brandScore)
+    console.log("[v0] Returning success response - reportId:", reportId, "brandScore:", response.brandScore)
     return NextResponse.json(response)
   } catch (error) {
     console.error("[v0] FATAL ERROR:", error)
