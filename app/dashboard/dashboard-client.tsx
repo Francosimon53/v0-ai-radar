@@ -93,11 +93,34 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
     setRunError(null)
     setIsRunning(true)
 
-    // Simulate analysis delay (no backend call)
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/analysis/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ configId: dashboardData?.configId || "current" }),
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Analysis failed" }))
+        throw new Error(errorData.error || "Analysis failed")
+      }
+
+      const data = await res.json()
+
+      // Refresh dashboard metrics
+      router.refresh()
+
+      // Navigate to the new report
+      if (data.analysisId) {
+        router.push(`/dashboard/reports/${data.analysisId}`)
+      } else {
+        router.push("/dashboard/reports")
+      }
+    } catch (error) {
+      console.error("[v0] Run analysis error:", error)
+      setRunError(error instanceof Error ? error.message : "Analysis failed. Please try again.")
       setIsRunning(false)
-      router.push("/dashboard/reports/sample")
-    }, 2000)
+    }
   }
 
   if (loading) {
