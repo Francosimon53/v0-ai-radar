@@ -11,19 +11,22 @@ export async function runBrandAnalysis(configId?: string): Promise<RunAnalysisRe
     body: JSON.stringify({ configId: configId || "current" }),
   })
 
+  const data = await res.json().catch(() => null)
+
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({ error: "Analysis failed" }))
-    throw new Error(errorData.error || "Analysis failed")
+    const errorMessage = data?.error || data?.message || "Analysis failed"
+    throw new Error(errorMessage)
   }
 
-  const data = await res.json()
+  const reportId = data?.analysisId || data?.reportId || data?.id
 
-  if (!data.analysisId) {
-    throw new Error("No report ID returned from analysis")
+  if (!reportId) {
+    console.error("[v0] API response missing report ID:", data)
+    throw new Error("Analysis completed but no report ID was returned. Please check your database configuration.")
   }
 
   return {
-    analysisId: data.analysisId,
+    analysisId: reportId,
     success: true,
   }
 }
