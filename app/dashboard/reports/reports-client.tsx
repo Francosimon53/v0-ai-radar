@@ -101,7 +101,6 @@ export default function ReportsClient() {
   if (isLoading) {
     return (
       <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-        {/* Left column skeleton */}
         <div className="space-y-4">
           <div>
             <div className="h-8 w-48 bg-zinc-800 rounded animate-pulse mb-2" />
@@ -118,7 +117,6 @@ export default function ReportsClient() {
             </CardContent>
           </Card>
         </div>
-        {/* Right column loading */}
         <div className="flex items-center justify-center min-h-[300px]">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
@@ -133,7 +131,6 @@ export default function ReportsClient() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="max-w-lg w-full border-zinc-700 bg-gradient-to-b from-zinc-900 to-zinc-900/50 relative overflow-hidden">
-          {/* Gradient border effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 opacity-50 blur-xl" />
           <CardContent className="relative p-8 flex flex-col items-center text-center">
             <div className="h-16 w-16 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-6">
@@ -141,7 +138,8 @@ export default function ReportsClient() {
             </div>
             <h2 className="text-2xl font-bold text-white mb-3">No AI reports yet</h2>
             <p className="text-zinc-400 mb-6 leading-relaxed">
-              Once you run your first AI brand analysis, you'll see executive-ready reports here with:
+              Run your first AI brand analysis to generate executive-ready reports you can share with clients or
+              stakeholders.
             </p>
             <ul className="text-left text-zinc-400 space-y-2 mb-8 w-full max-w-sm">
               <li className="flex items-start gap-2">
@@ -160,7 +158,7 @@ export default function ReportsClient() {
             <Button
               onClick={() => router.push("/dashboard")}
               size="lg"
-              className="bg-blue-600 hover:bg-blue-700 w-full max-w-xs"
+              className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
             >
               <Sparkles className="mr-2 h-4 w-4" />
               Run first analysis
@@ -182,7 +180,6 @@ export default function ReportsClient() {
           </p>
         </div>
 
-        {/* Error state */}
         {error && (
           <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -254,7 +251,6 @@ export default function ReportsClient() {
           </Card>
         ) : (
           <>
-            {/* Report header */}
             <Card className="bg-zinc-900 border-zinc-800">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
@@ -281,7 +277,6 @@ export default function ReportsClient() {
                   {getStatusBadge(selectedReport.status)}
                 </div>
 
-                {/* Executive summary */}
                 <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
                   <p className="text-zinc-300 leading-relaxed">
                     {selectedReport.summary ||
@@ -291,7 +286,6 @@ export default function ReportsClient() {
               </CardContent>
             </Card>
 
-            {/* Three metric cards */}
             <div className="grid gap-4 sm:grid-cols-3">
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardContent className="p-4">
@@ -340,7 +334,6 @@ export default function ReportsClient() {
               </Card>
             </div>
 
-            {/* View full report button */}
             <Button
               onClick={() => router.push(`/dashboard/reports/${selectedReport.id}`)}
               className="w-full bg-blue-600 hover:bg-blue-700"
