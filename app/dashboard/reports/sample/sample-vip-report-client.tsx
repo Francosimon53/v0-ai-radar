@@ -1,185 +1,249 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import {
-  ArrowLeft,
-  FileText,
-  TrendingUp,
-  Target,
-  Users,
-  Zap,
-  BarChart3,
-  MessageSquareQuote,
-  Calendar,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { SAMPLE_VIP_REPORT } from "../sampleVipReport"
+import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
-const sections = [
-  { id: "executive-summary", label: "Executive Summary", icon: FileText },
-  { id: "ai-health", label: "AI Brand Health", icon: TrendingUp },
-  { id: "swot", label: "SWOT Snapshot", icon: Target },
-  { id: "competitors", label: "Competitor Ranking", icon: Users },
-  { id: "key-phrases", label: "Key AI Phrases", icon: MessageSquareQuote },
-  { id: "action-plan", label: "Action Plan", icon: Calendar },
-  { id: "methodology", label: "Methodology", icon: BarChart3 },
-]
+const mockReport = {
+  brandName: "Nike",
+  industry: "Sportswear & footwear",
+  date: "Preview mode – example data only",
+  overallScore: 84,
+  shareOfVoice: 47,
+  sentiment: "Mostly positive",
+  modelsQueried: 5,
+  executiveSummary:
+    "AI assistants describe Nike as an innovative, performance-driven brand with strong cultural relevance. Visibility is high in running, training, and lifestyle segments, with growing traction in women's performance and sustainability narratives.",
+  swot: {
+    strengths: [
+      "High association with performance, innovation, and elite athletes.",
+      "Strong recall in running, training, and lifestyle categories.",
+      "Positive perception of digital experiences (apps, community, content).",
+    ],
+    weaknesses: [
+      "Price sensitivity vs budget competitors in some markets.",
+      "Mixed perception around sustainability transparency.",
+    ],
+    opportunities: [
+      "Own the 'everyday athlete' positioning in AI assistants' recommendations.",
+      "Create targeted content for women's performance and wellness use cases.",
+      "Anchor sustainability narratives around specific, verifiable initiatives.",
+    ],
+    threats: [
+      "Competitors increasing share of voice in sustainability and comfort.",
+      "AI assistants recommending marketplaces or generic categories instead of brand-first.",
+    ],
+  },
+  competitors: [
+    { name: "Adidas", score: 78, shareOfVoice: 29 },
+    { name: "Puma", score: 72, shareOfVoice: 18 },
+    { name: "New Balance", score: 75, shareOfVoice: 12 },
+  ],
+  actionPlan90_30_7: {
+    ninetyDays: [
+      "Launch an AI-ready content kit for top 10 use cases (running, training, lifestyle, women's performance).",
+      "Standardize product descriptions and FAQs to align with AI assistants' most frequent questions.",
+    ],
+    thirtyDays: [
+      "Audit how Nike appears across ChatGPT, Gemini, and other AI models for 3 core personas.",
+      "Define a 'Brand in AI' playbook with guardrails and messaging pillars.",
+    ],
+    sevenDays: [
+      "Run an internal workshop: 'How AI currently sees Nike' with this report as starting point.",
+      "Prioritize 3 quick fixes for product pages or content gaps surfaced by AI answers.",
+    ],
+  },
+}
 
 export default function SampleVipReportClient() {
   const router = useRouter()
-  const [activeSection, setActiveSection] = useState("executive-summary")
-  const report = SAMPLE_VIP_REPORT
-
-  const scrollToSection = (id: string) => {
-    setActiveSection(id)
-    const element = document.getElementById(id)
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" })
-    }
-  }
-
-  const renderBody = (body: string) => {
-    const lines = body.split("\n")
-    return lines.map((line, i) => {
-      const trimmed = line.trim()
-      if (!trimmed) return <br key={i} />
-      if (trimmed.startsWith("•")) {
-        return (
-          <li key={i} className="ml-4 text-zinc-300">
-            {trimmed.substring(1).trim()}
-          </li>
-        )
-      }
-      if (trimmed.endsWith(":") || (/^[A-Z]/.test(trimmed) && trimmed.length < 60 && !trimmed.includes("."))) {
-        return (
-          <h4 key={i} className="text-lg font-semibold text-white mt-6 mb-2">
-            {trimmed}
-          </h4>
-        )
-      }
-      return (
-        <p key={i} className="text-zinc-300 leading-relaxed mb-3">
-          {trimmed}
-        </p>
-      )
-    })
-  }
 
   return (
-    <div className="min-h-screen bg-zinc-950">
-      {/* Demo Banner */}
-      <div className="sticky top-0 z-50 flex items-center justify-between bg-gradient-to-r from-purple-500/10 via-blue-500/10 to-purple-500/10 border-b border-purple-500/20 px-6 py-3">
-        <div className="flex items-center gap-3">
-          <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 font-semibold">SAMPLE REPORT</Badge>
-          <span className="text-sm text-purple-200">This is a demo preview with static Nike data</span>
+    <div className="px-6 py-8 space-y-6 max-w-6xl mx-auto">
+      {/* Top bar */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            VIP AI Brand Report <span className="text-primary">– Sample</span>
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            This is a sample executive-style report using example data only. Your real reports will use live AI
+            visibility scans.
+          </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => router.back()} className="text-zinc-400 hover:text-white">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Dashboard
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline">Preview mode</Badge>
+          <Button variant="outline" onClick={() => router.push("/dashboard/reports")}>
+            Back to Reports
+          </Button>
+        </div>
       </div>
 
-      <div className="flex">
-        {/* Sidebar Navigation */}
-        <aside className="hidden lg:block w-64 sticky top-[57px] h-[calc(100vh-57px)] border-r border-zinc-800 bg-zinc-900/50 overflow-y-auto">
-          <nav className="p-4 space-y-1">
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4 px-3">Report Sections</p>
-            {sections.map((section) => {
-              const Icon = section.icon
-              return (
-                <button
-                  key={section.id}
-                  onClick={() => scrollToSection(section.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    activeSection === section.id
-                      ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                      : "text-zinc-400 hover:text-white hover:bg-zinc-800"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {section.label}
-                </button>
-              )
-            })}
-          </nav>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 max-w-4xl mx-auto px-6 py-10">
-          {/* Report Header */}
-          <div className="mb-10">
-            <div className="flex items-center gap-3 mb-4">
-              <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20">VIP Report</Badge>
-              <Badge variant="outline" className="border-zinc-700 text-zinc-400">
-                {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-              </Badge>
+      {/* Overview cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">AI Brand Score</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-semibold">
+              {mockReport.overallScore}
+              <span className="text-base text-muted-foreground"> / 100</span>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">{report.title}</h1>
-            <p className="text-zinc-400">
-              AI brand perception analysis for <span className="text-white font-medium">{report.brandName}</span>
+            <p className="mt-1 text-xs text-muted-foreground">Overall strength vs other brands in AI responses.</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">Share of Voice</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-semibold">
+              {mockReport.shareOfVoice}
+              <span className="text-base">%</span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              How often Nike appears vs key competitors in AI answers.
             </p>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-3 gap-4 mb-10">
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardContent className="p-4 text-center">
-                <p className="text-3xl font-bold text-blue-400">78</p>
-                <p className="text-xs text-zinc-500 mt-1">AI Brand Score</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardContent className="p-4 text-center">
-                <p className="text-3xl font-bold text-green-400">42%</p>
-                <p className="text-xs text-zinc-500 mt-1">Share of Voice</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardContent className="p-4 text-center">
-                <p className="text-3xl font-bold text-purple-400">4</p>
-                <p className="text-xs text-zinc-500 mt-1">Competitors Tracked</p>
-              </CardContent>
-            </Card>
-          </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">Models Queried</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-semibold">{mockReport.modelsQueried}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Major AI assistants used in this visibility scan.</p>
+          </CardContent>
+        </Card>
+      </div>
 
-          {/* Report Sections */}
-          <div className="space-y-12">
-            {report.sections.map((section) => (
-              <section key={section.id} id={section.id} className="scroll-mt-24">
-                <Card className="bg-zinc-900/50 border-zinc-800">
-                  <CardHeader className="border-b border-zinc-800">
-                    <CardTitle className="text-xl text-white flex items-center gap-3">
-                      {section.id === "executive-summary" && <FileText className="h-5 w-5 text-blue-400" />}
-                      {section.id === "ai-health" && <TrendingUp className="h-5 w-5 text-green-400" />}
-                      {section.id === "swot" && <Target className="h-5 w-5 text-yellow-400" />}
-                      {section.id === "competitors" && <Users className="h-5 w-5 text-purple-400" />}
-                      {section.id === "key-phrases" && <MessageSquareQuote className="h-5 w-5 text-cyan-400" />}
-                      {section.id === "action-plan" && <Calendar className="h-5 w-5 text-orange-400" />}
-                      {section.id === "methodology" && <BarChart3 className="h-5 w-5 text-zinc-400" />}
-                      {section.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="prose prose-invert max-w-none">{renderBody(section.body)}</div>
-                  </CardContent>
-                </Card>
-              </section>
+      {/* Executive summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Executive summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-sm text-muted-foreground">{mockReport.date}</p>
+          <p className="text-sm leading-relaxed">{mockReport.executiveSummary}</p>
+        </CardContent>
+      </Card>
+
+      {/* AI SWOT snapshot */}
+      <Card>
+        <CardHeader>
+          <CardTitle>AI SWOT snapshot</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-emerald-400">Strengths</h3>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {mockReport.swot.strengths.map((item, i) => (
+                <li key={i}>• {item}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-amber-400">Weaknesses</h3>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {mockReport.swot.weaknesses.map((item, i) => (
+                <li key={i}>• {item}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-sky-400">Opportunities</h3>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {mockReport.swot.opportunities.map((item, i) => (
+                <li key={i}>• {item}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-rose-400">Threats</h3>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {mockReport.swot.threats.map((item, i) => (
+                <li key={i}>• {item}</li>
+              ))}
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Competitor comparison */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Competitor comparison (AI visibility)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">How AI assistants score and mention Nike vs key competitors.</p>
+          <div className="grid gap-3 md:grid-cols-3">
+            {mockReport.competitors.map((c) => (
+              <div
+                key={c.name}
+                className="rounded-xl border bg-gradient-to-br from-zinc-900/60 to-zinc-900/20 p-3 space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">{c.name}</span>
+                  <span className="text-xs text-muted-foreground">Share of voice: {c.shareOfVoice}%</span>
+                </div>
+                <div className="text-2xl font-semibold">
+                  {c.score}
+                  <span className="text-xs text-muted-foreground"> / 100</span>
+                </div>
+              </div>
             ))}
           </div>
+        </CardContent>
+      </Card>
 
-          {/* CTA Footer */}
-          <div className="mt-12 p-8 rounded-xl bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-blue-500/10 border border-blue-500/20 text-center">
-            <h3 className="text-xl font-semibold text-white mb-2">Ready to see your own AI Brand Report?</h3>
-            <p className="text-zinc-400 mb-6">Run your first analysis and get personalized insights for your brand.</p>
-            <Button size="lg" onClick={() => router.push("/dashboard")} className="bg-blue-600 hover:bg-blue-700">
-              <Zap className="mr-2 h-4 w-4" />
-              Go to Dashboard
-            </Button>
+      {/* 90 / 30 / 7-day plan */}
+      <Card>
+        <CardHeader>
+          <CardTitle>90 / 30 / 7-day action plan</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-3">
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Next 90 days</h3>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {mockReport.actionPlan90_30_7.ninetyDays.map((item, i) => (
+                <li key={i}>• {item}</li>
+              ))}
+            </ul>
           </div>
-        </main>
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Next 30 days</h3>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {mockReport.actionPlan90_30_7.thirtyDays.map((item, i) => (
+                <li key={i}>• {item}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Next 7 days</h3>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {mockReport.actionPlan90_30_7.sevenDays.map((item, i) => (
+                <li key={i}>• {item}</li>
+              ))}
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Call to action */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800 pt-4">
+        <p className="text-xs text-muted-foreground">
+          This is a static sample. Your real reports will be generated once AI scans are enabled in your workspace.
+        </p>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => router.push("/dashboard")}>
+            Back to Dashboard
+          </Button>
+          <Button disabled>Download PDF (coming soon)</Button>
+        </div>
       </div>
     </div>
   )
