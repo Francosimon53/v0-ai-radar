@@ -172,12 +172,12 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
               {isRunning ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Running Analysis...
+                  Analyzing...
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Run first analysis
+                  Run Analysis
                 </>
               )}
             </Button>
@@ -192,6 +192,9 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
             </Button>
           </div>
           {runError && <p className="mt-3 text-sm text-red-400">{runError}</p>}
+          <p className="text-xs text-zinc-500 mt-2">
+            You can preview a full VIP-style report using sample data while your first live analysis is being set up.
+          </p>
         </div>
       </div>
 
@@ -441,7 +444,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
 
           {/* Threats */}
           <Card className="border-red-500/20 bg-zinc-900">
-            <CardHeader className="pb-3">
+            <CardHeader>
               <div className="flex items-center gap-2">
                 <div className="rounded-lg bg-red-500/10 p-1.5">
                   <Shield className="h-4 w-4 text-red-500" />

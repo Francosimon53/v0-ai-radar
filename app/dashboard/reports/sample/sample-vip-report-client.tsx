@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import { Download, Copy, Share2 } from "lucide-react"
 
 const mockReport = {
   brandName: "Nike",
@@ -59,140 +60,206 @@ const mockReport = {
 export default function SampleVipReportClient() {
   const router = useRouter()
 
+  const handleDownloadPdf = () => {
+    alert("In this demo, PDF export will be available soon.")
+  }
+
+  const handleCopyInsights = () => {
+    const insights = `AI Brand Report - ${mockReport.brandName}
+    
+AI Brand Score: ${mockReport.overallScore}/100
+Share of Voice: ${mockReport.shareOfVoice}%
+
+Executive Summary:
+${mockReport.executiveSummary}
+
+Key Strengths:
+${mockReport.swot.strengths.map((s) => `• ${s}`).join("\n")}
+
+Next 7 Days:
+${mockReport.actionPlan90_30_7.sevenDays.map((s) => `• ${s}`).join("\n")}`
+
+    navigator.clipboard.writeText(insights)
+    alert("Key insights copied to clipboard!")
+  }
+
+  const handleShare = () => {
+    alert("Client sharing will be available soon.")
+  }
+
   return (
     <div className="px-6 py-8 space-y-6 max-w-6xl mx-auto">
-      {/* Top bar */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            VIP AI Brand Report <span className="text-primary">– Sample</span>
-          </h1>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">VIP AI Brand Report – Sample</h1>
+            <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/20">Preview mode</Badge>
+          </div>
+          <p className="text-sm text-muted-foreground max-w-xl leading-relaxed">
             This is a sample executive-style report using example data only. Your real reports will use live AI
             visibility scans.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">Preview mode</Badge>
-          <Button variant="outline" onClick={() => router.push("/dashboard/reports")}>
-            Back to Reports
-          </Button>
+        <Button variant="outline" onClick={() => router.push("/dashboard/reports")}>
+          Back to Reports
+        </Button>
+      </div>
+
+      <div className="space-y-2">
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-zinc-400 uppercase tracking-wide">AI Brand Score</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-white">
+                {mockReport.overallScore}
+                <span className="text-lg text-zinc-400 font-normal"> / 100</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-zinc-400 uppercase tracking-wide">Share of Voice</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-white">
+                {mockReport.shareOfVoice}
+                <span className="text-lg text-zinc-400 font-normal">%</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-zinc-400 uppercase tracking-wide">Models Queried</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-white">{mockReport.modelsQueried}</div>
+            </CardContent>
+          </Card>
         </div>
+        <p className="text-xs text-zinc-500 text-center">
+          Benchmarked vs closest AI-visible competitors in your category.
+        </p>
       </div>
 
-      {/* Overview cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">AI Brand Score</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-semibold">
-              {mockReport.overallScore}
-              <span className="text-base text-muted-foreground"> / 100</span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">Overall strength vs other brands in AI responses.</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">Share of Voice</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-semibold">
-              {mockReport.shareOfVoice}
-              <span className="text-base">%</span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              How often Nike appears vs key competitors in AI answers.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">Models Queried</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-semibold">{mockReport.modelsQueried}</div>
-            <p className="mt-1 text-xs text-muted-foreground">Major AI assistants used in this visibility scan.</p>
-          </CardContent>
-        </Card>
+      <div className="flex flex-wrap items-center justify-end gap-2 border-b border-zinc-800 pb-4">
+        <Button onClick={handleDownloadPdf} className="bg-blue-600 hover:bg-blue-700">
+          <Download className="mr-2 h-4 w-4" />
+          Download sample as PDF
+        </Button>
+        <Button
+          variant="outline"
+          onClick={handleCopyInsights}
+          className="border-zinc-700 hover:bg-zinc-800 bg-transparent"
+        >
+          <Copy className="mr-2 h-4 w-4" />
+          Copy key insights
+        </Button>
+        <Button variant="ghost" onClick={handleShare} className="text-zinc-400 hover:text-white">
+          <Share2 className="mr-2 h-4 w-4" />
+          Share with client (coming soon)
+        </Button>
       </div>
 
-      {/* Executive summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Executive summary</CardTitle>
+      <Card className="bg-zinc-900 border-zinc-800">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-zinc-400 uppercase tracking-wide">
+            Executive summary (for clients)
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-sm text-muted-foreground">{mockReport.date}</p>
-          <p className="text-sm leading-relaxed">{mockReport.executiveSummary}</p>
+        <CardContent>
+          <p className="text-sm text-zinc-400 mb-3">{mockReport.date}</p>
+          <p className="text-zinc-200 leading-relaxed max-w-3xl">{mockReport.executiveSummary}</p>
         </CardContent>
       </Card>
 
-      {/* AI SWOT snapshot */}
-      <Card>
+      <Card className="bg-zinc-900 border-zinc-800">
         <CardHeader>
-          <CardTitle>AI SWOT snapshot</CardTitle>
+          <CardTitle className="text-lg font-semibold text-white">AI SWOT snapshot</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-emerald-400">Strengths</h3>
-            <ul className="space-y-1 text-sm text-muted-foreground">
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          {/* Strengths */}
+          <div className="rounded-lg border border-zinc-800 p-4 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-green-500"></span>
+              <span className="text-green-400">Strengths</span>
+            </h3>
+            <ul className="space-y-2 text-sm text-zinc-300">
               {mockReport.swot.strengths.map((item, i) => (
-                <li key={i}>• {item}</li>
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">•</span>
+                  <span>{item}</span>
+                </li>
               ))}
             </ul>
           </div>
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-amber-400">Weaknesses</h3>
-            <ul className="space-y-1 text-sm text-muted-foreground">
+          {/* Weaknesses */}
+          <div className="rounded-lg border border-zinc-800 p-4 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-yellow-500"></span>
+              <span className="text-yellow-400">Weaknesses</span>
+            </h3>
+            <ul className="space-y-2 text-sm text-zinc-300">
               {mockReport.swot.weaknesses.map((item, i) => (
-                <li key={i}>• {item}</li>
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-yellow-500 mt-0.5">•</span>
+                  <span>{item}</span>
+                </li>
               ))}
             </ul>
           </div>
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-sky-400">Opportunities</h3>
-            <ul className="space-y-1 text-sm text-muted-foreground">
+          {/* Opportunities */}
+          <div className="rounded-lg border border-zinc-800 p-4 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+              <span className="text-blue-400">Opportunities</span>
+            </h3>
+            <ul className="space-y-2 text-sm text-zinc-300">
               {mockReport.swot.opportunities.map((item, i) => (
-                <li key={i}>• {item}</li>
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-blue-500 mt-0.5">•</span>
+                  <span>{item}</span>
+                </li>
               ))}
             </ul>
           </div>
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-rose-400">Threats</h3>
-            <ul className="space-y-1 text-sm text-muted-foreground">
+          {/* Threats */}
+          <div className="rounded-lg border border-zinc-800 p-4 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-red-500"></span>
+              <span className="text-red-400">Threats</span>
+            </h3>
+            <ul className="space-y-2 text-sm text-zinc-300">
               {mockReport.swot.threats.map((item, i) => (
-                <li key={i}>• {item}</li>
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">•</span>
+                  <span>{item}</span>
+                </li>
               ))}
             </ul>
           </div>
         </CardContent>
       </Card>
 
-      {/* Competitor comparison */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Competitor comparison (AI visibility)</CardTitle>
+      <Card className="bg-zinc-900 border-zinc-800">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-lg font-semibold text-white">Competitor comparison (AI visibility)</CardTitle>
+          <p className="text-sm text-zinc-400">How AI assistants score and mention Nike vs key competitors.</p>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">How AI assistants score and mention Nike vs key competitors.</p>
-          <div className="grid gap-3 md:grid-cols-3">
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {mockReport.competitors.map((c) => (
-              <div
-                key={c.name}
-                className="rounded-xl border bg-gradient-to-br from-zinc-900/60 to-zinc-900/20 p-3 space-y-1"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{c.name}</span>
-                  <span className="text-xs text-muted-foreground">Share of voice: {c.shareOfVoice}%</span>
-                </div>
-                <div className="text-2xl font-semibold">
-                  {c.score}
-                  <span className="text-xs text-muted-foreground"> / 100</span>
+              <div key={c.name} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 space-y-2">
+                <p className="font-medium text-white">{c.name}</p>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-2xl font-bold text-white">
+                    {c.score}
+                    <span className="text-sm text-zinc-400 font-normal">/100</span>
+                  </span>
+                  <span className="text-xs text-zinc-400">SoV: {c.shareOfVoice}%</span>
                 </div>
               </div>
             ))}
@@ -200,50 +267,66 @@ export default function SampleVipReportClient() {
         </CardContent>
       </Card>
 
-      {/* 90 / 30 / 7-day plan */}
-      <Card>
-        <CardHeader>
-          <CardTitle>90 / 30 / 7-day action plan</CardTitle>
+      <Card className="bg-zinc-900 border-zinc-800">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-lg font-semibold text-white">90 / 30 / 7-day action plan</CardTitle>
+          <p className="text-sm text-zinc-400">
+            Practical roadmap you can paste into your internal plan or client deck.
+          </p>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold">Next 90 days</h3>
-            <ul className="space-y-1 text-sm text-muted-foreground">
-              {mockReport.actionPlan90_30_7.ninetyDays.map((item, i) => (
-                <li key={i}>• {item}</li>
-              ))}
-            </ul>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-white border-b border-zinc-800 pb-2">Next 90 days</h3>
+              <ul className="space-y-2 text-sm text-zinc-300">
+                {mockReport.actionPlan90_30_7.ninetyDays.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-blue-500 mt-0.5">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-white border-b border-zinc-800 pb-2">Next 30 days</h3>
+              <ul className="space-y-2 text-sm text-zinc-300">
+                {mockReport.actionPlan90_30_7.thirtyDays.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-cyan-500 mt-0.5">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-white border-b border-zinc-800 pb-2">Next 7 days</h3>
+              <ul className="space-y-2 text-sm text-zinc-300">
+                {mockReport.actionPlan90_30_7.sevenDays.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold">Next 30 days</h3>
-            <ul className="space-y-1 text-sm text-muted-foreground">
-              {mockReport.actionPlan90_30_7.thirtyDays.map((item, i) => (
-                <li key={i}>• {item}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold">Next 7 days</h3>
-            <ul className="space-y-1 text-sm text-muted-foreground">
-              {mockReport.actionPlan90_30_7.sevenDays.map((item, i) => (
-                <li key={i}>• {item}</li>
-              ))}
-            </ul>
-          </div>
+          <p className="text-xs text-zinc-500 italic pt-2 border-t border-zinc-800">
+            Tip: Use &quot;Copy key insights&quot; at the top of this page to reuse these bullets in your own slides.
+          </p>
         </CardContent>
       </Card>
 
-      {/* Call to action */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800 pt-4">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-zinc-500">
           This is a static sample. Your real reports will be generated once AI scans are enabled in your workspace.
         </p>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push("/dashboard")}>
-            Back to Dashboard
-          </Button>
-          <Button disabled>Download PDF (coming soon)</Button>
-        </div>
+        <Button
+          variant="outline"
+          onClick={() => router.push("/dashboard")}
+          className="border-zinc-700 hover:bg-zinc-800 bg-transparent"
+        >
+          Back to Dashboard
+        </Button>
       </div>
     </div>
   )

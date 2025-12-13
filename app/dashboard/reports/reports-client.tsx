@@ -20,6 +20,7 @@ import {
   XCircle,
   Lightbulb,
   ShieldAlert,
+  Eye,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -177,14 +178,25 @@ export default function ReportsClient() {
                 <span>90 / 30 / 7-day action plan for your next campaigns.</span>
               </li>
             </ul>
-            <Button
-              onClick={() => router.push("/dashboard")}
-              size="lg"
-              className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Run first analysis
-            </Button>
+            <div className="flex flex-col items-center gap-3 w-full">
+              <Button
+                onClick={() => router.push("/dashboard")}
+                size="lg"
+                className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Run first analysis
+              </Button>
+              <Button
+                onClick={() => router.push("/dashboard/reports/sample")}
+                variant="ghost"
+                size="sm"
+                className="text-zinc-400 hover:text-white"
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Preview sample VIP report
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
