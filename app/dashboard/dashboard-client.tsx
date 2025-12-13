@@ -363,6 +363,9 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
 
       <div>
         <h2 className="mb-4 text-2xl font-bold text-white">AI SWOT Snapshot</h2>
+        <p className="text-xs text-zinc-500">
+          Score drops and new AI threats will automatically create alerts in your Alerts tab.
+        </p>
         <div className="grid gap-4 md:grid-cols-2">
           {/* Strengths */}
           <Card className="border-green-500/20 bg-zinc-900">

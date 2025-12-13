@@ -1,13 +1,14 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -23,6 +24,9 @@ import {
   Loader2,
   Trash2,
   CheckCheck,
+  Radar,
+  FileText,
+  Eye,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 
@@ -46,6 +50,13 @@ interface Alert {
     brand?: string
     metric?: string
   }
+}
+
+interface AlertSettings {
+  emailEnabled: boolean
+  scoreDropThreshold: number
+  competitorAlerts: boolean
+  weeklyDigest: boolean
 }
 
 const alertTypeConfig: Record<
@@ -89,6 +100,49 @@ const alertTypeConfig: Record<
   },
 }
 
+const SAMPLE_ALERTS: Alert[] = [
+  {
+    id: "demo-1",
+    type: "score_drop",
+    title: "AI Brand Score dropped -6 points",
+    message: "Nike's AI Brand Score fell from 84 to 78 after new content responses on Gemini.",
+    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2h ago
+    severity: "high",
+    read: false,
+    data: { from: 84, to: 78, change: -6 },
+  },
+  {
+    id: "demo-2",
+    type: "competitor_rise",
+    title: "New high-threat competitor surfaced",
+    message: "Puma is now ranked as a medium-high threat in AI responses for running and training queries.",
+    created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Yesterday
+    severity: "high",
+    read: false,
+    data: { brand: "Puma" },
+  },
+  {
+    id: "demo-3",
+    type: "milestone",
+    title: "Share of Voice passed 40%",
+    message: "Nike now appears in 41% of AI recommendations vs Adidas and Puma for top running queries.",
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
+    severity: "low",
+    read: true,
+    data: { metric: "Share of Voice", from: 38, to: 41, change: 3 },
+  },
+  {
+    id: "demo-4",
+    type: "rank_change",
+    title: "Rank improved in 'best running shoes' query",
+    message: "Nike moved from #3 to #1 position in ChatGPT responses for 'best running shoes 2024'.",
+    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
+    severity: "medium",
+    read: true,
+    data: { from: 3, to: 1, change: 2 },
+  },
+]
+
 function formatTimeAgo(dateString: string): string {
   const date = new Date(dateString)
   const now = new Date()
@@ -111,18 +165,45 @@ export default function AlertsClient() {
   const [showDetail, setShowDetail] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [activeFilter, setActiveFilter] = useState<AlertType | "all">("all")
+  const [showDemoAlerts, setShowDemoAlerts] = useState(false)
   const { toast } = useToast()
-
-  // Alert settings state
-  const [alertSettings, setAlertSettings] = useState({
-    emailEnabled: true,
+  const [alertSettings, setAlertSettings] = useState<AlertSettings>({
+    emailEnabled: false,
     scoreDropThreshold: 5,
-    competitorAlerts: true,
-    weeklyDigest: true,
-    quietHoursEnabled: false,
-    quietHoursStart: "22:00",
-    quietHoursEnd: "08:00",
+    competitorAlerts: false,
+    weeklyDigest: false,
   })
+
+  const displayedAlerts = useMemo(() => {
+    const sourceAlerts = alerts.length === 0 && showDemoAlerts ? SAMPLE_ALERTS : alerts
+    if (activeFilter === "all") return sourceAlerts
+    return sourceAlerts.filter((a) => a.type === activeFilter)
+  }, [alerts, showDemoAlerts, activeFilter])
+
+  const isInDemoMode = alerts.length === 0 && showDemoAlerts
+
+  const filterTabs = [
+    { key: "all" as const, label: "All", count: displayedAlerts.length },
+    {
+      key: "score_drop" as const,
+      label: "Score Drops",
+      count: displayedAlerts.filter((a) => a.type === "score_drop").length,
+    },
+    {
+      key: "competitor_rise" as const,
+      label: "Competitors",
+      count: displayedAlerts.filter((a) => a.type === "competitor_rise").length,
+    },
+    {
+      key: "milestone" as const,
+      label: "Milestones",
+      count: displayedAlerts.filter((a) => a.type === "milestone").length,
+    },
+  ]
+
+  const handleDemoAction = (action: string) => {
+    alert(`This is a demo. In the full version, this would ${action}.`)
+  }
 
   useEffect(() => {
     fetchAlerts()
@@ -251,17 +332,6 @@ export default function AlertsClient() {
     }
   }
 
-  const filterTabs = [
-    { key: "all" as const, label: "All", count: alerts.length },
-    { key: "score_drop" as const, label: "Score Drops", count: alerts.filter((a) => a.type === "score_drop").length },
-    {
-      key: "competitor_rise" as const,
-      label: "Competitors",
-      count: alerts.filter((a) => a.type === "competitor_rise").length,
-    },
-    { key: "milestone" as const, label: "Milestones", count: alerts.filter((a) => a.type === "milestone").length },
-  ]
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -275,20 +345,38 @@ export default function AlertsClient() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Alerts</h1>
-          <p className="text-slate-400 mt-1">Stay informed about changes in your brand perception</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-white">Alerts</h1>
+            <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-400">
+              <Radar className="mr-1 h-3 w-3" />
+              AI Risk Radar
+            </Badge>
+          </div>
+          <p className="text-zinc-400 mt-1">
+            Stay informed about changes in your brand's AI perception across scores, competitors, and key milestones.
+          </p>
         </div>
         <div className="flex items-center gap-3">
           {unreadCount > 0 && (
             <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-sm rounded-full">{unreadCount} unread</span>
           )}
           {alerts.some((a) => !a.read) && (
-            <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMarkAllAsRead}
+              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 bg-transparent"
+            >
               <CheckCheck className="h-4 w-4 mr-2" />
               Mark all read
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => setShowSettings(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSettings(true)}
+            className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+          >
             <Settings className="h-4 w-4 mr-2" />
             Settings
           </Button>
@@ -302,13 +390,13 @@ export default function AlertsClient() {
             key={tab.key}
             onClick={() => setActiveFilter(tab.key)}
             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-              activeFilter === tab.key ? "bg-blue-500 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+              activeFilter === tab.key ? "bg-blue-500 text-white" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
             }`}
           >
             {tab.label}
             <span
               className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
-                activeFilter === tab.key ? "bg-blue-600" : "bg-slate-700"
+                activeFilter === tab.key ? "bg-blue-600" : "bg-zinc-700"
               }`}
             >
               {tab.count}
@@ -317,33 +405,48 @@ export default function AlertsClient() {
         ))}
       </div>
 
-      {/* Empty State */}
-      {alerts.length === 0 ? (
-        <Card className="bg-slate-800/50 border-slate-700">
+      {isInDemoMode && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2">
+          <Eye className="h-4 w-4 text-amber-500" />
+          <span className="text-sm text-amber-400">
+            Preview mode – example alerts only. Your real alerts will appear here once AI scans are live.
+          </span>
+        </div>
+      )}
+
+      {alerts.length === 0 && !showDemoAlerts ? (
+        <Card className="border-zinc-800 bg-zinc-900">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mb-4">
-              <Bell className="h-8 w-8 text-slate-500" />
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center mb-4">
+              <Radar className="h-8 w-8 text-blue-400" />
             </div>
             <h3 className="text-lg font-medium text-white mb-2">No alerts yet</h3>
-            <p className="text-slate-400 text-center max-w-sm">
-              When there are significant changes in your brand perception, you'll see alerts here.
+            <p className="text-zinc-400 text-center max-w-md mb-2">
+              You'll see alerts here when AI scores move, new threats appear, or key milestones are hit.
             </p>
+            <p className="text-zinc-500 text-center text-sm max-w-md mb-6">
+              For now, you can preview how alerts will look in your workspace.
+            </p>
+            <Button onClick={() => setShowDemoAlerts(true)} className="bg-blue-600 hover:bg-blue-700">
+              <Eye className="h-4 w-4 mr-2" />
+              Preview sample alerts
+            </Button>
           </CardContent>
         </Card>
       ) : (
         /* Alert List */
         <div className="space-y-3">
-          {alerts.map((alert) => {
+          {displayedAlerts.map((alert) => {
             const config = alertTypeConfig[alert.type]
             const Icon = config.icon
 
             return (
               <Card
                 key={alert.id}
-                className={`bg-slate-800/50 border-slate-700 border-l-4 ${config.borderColor} cursor-pointer hover:bg-slate-800 transition-colors ${
+                className={`group border-zinc-800 bg-zinc-900 border-l-4 ${config.borderColor} cursor-pointer hover:bg-zinc-800/80 hover:shadow-lg transition-all ${
                   !alert.read ? "bg-blue-500/5" : ""
                 }`}
-                onClick={() => handleAlertClick(alert)}
+                onClick={() => !isInDemoMode && handleAlertClick(alert)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
@@ -357,31 +460,92 @@ export default function AlertsClient() {
                           <h3 className="font-medium text-white">{alert.title}</h3>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-500 whitespace-nowrap">
+                          <Badge
+                            variant="outline"
+                            className={`text-xs border-0 ${
+                              alert.type === "score_drop"
+                                ? "bg-yellow-500/10 text-yellow-500"
+                                : alert.type === "competitor_rise"
+                                  ? "bg-red-500/10 text-red-500"
+                                  : alert.type === "milestone"
+                                    ? "bg-green-500/10 text-green-500"
+                                    : "bg-purple-500/10 text-purple-500"
+                            }`}
+                          >
+                            {config.label}
+                          </Badge>
+                          <span className="text-xs text-zinc-500 whitespace-nowrap">
                             {formatTimeAgo(alert.created_at)}
                           </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteAlert(alert.id)
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-400" />
-                          </Button>
+                          {!isInDemoMode && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteAlert(alert.id)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-zinc-400 hover:text-red-400" />
+                            </Button>
+                          )}
                         </div>
                       </div>
-                      <p className="text-sm text-slate-400 mt-1 line-clamp-2">{alert.message}</p>
+                      <p className="text-sm text-zinc-400 mt-1 line-clamp-2">{alert.message}</p>
+
+                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-zinc-800">
+                        <button
+                          className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (isInDemoMode) {
+                              handleDemoAction("open the related report")
+                            } else {
+                              // Real navigation would go here
+                            }
+                          }}
+                        >
+                          <FileText className="h-3 w-3" />
+                          View related report
+                        </button>
+                        <button
+                          className="text-xs text-zinc-500 hover:text-zinc-400 flex items-center gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (isInDemoMode) {
+                              handleDemoAction("mark this alert as read")
+                            } else {
+                              handleMarkAsRead(alert.id)
+                            }
+                          }}
+                        >
+                          <CheckCheck className="h-3 w-3" />
+                          Mark as read
+                        </button>
+                      </div>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                    {!isInDemoMode && <ChevronRight className="h-5 w-5 text-zinc-500 flex-shrink-0" />}
                   </div>
                 </CardContent>
               </Card>
             )
           })}
         </div>
+      )}
+
+      {displayedAlerts.length === 0 && showDemoAlerts && activeFilter !== "all" && (
+        <Card className="border-zinc-800 bg-zinc-900">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Bell className="h-8 w-8 text-zinc-600 mb-3" />
+            <p className="text-zinc-400 text-center">
+              No {filterTabs.find((t) => t.key === activeFilter)?.label.toLowerCase()} alerts in preview.
+            </p>
+            <Button variant="ghost" size="sm" onClick={() => setActiveFilter("all")} className="mt-2 text-blue-400">
+              View all alerts
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {/* Alert Detail Modal */}
