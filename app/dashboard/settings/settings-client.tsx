@@ -10,7 +10,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -34,10 +33,18 @@ import {
   Trash2,
   Zap,
   Lock,
-  Clock,
   FileText,
   CheckCircle,
   Loader2,
+  Bot,
+  Globe,
+  MessageSquare,
+  TrendingDown,
+  Users,
+  Target,
+  Mail,
+  Smartphone,
+  Send,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
@@ -106,6 +113,36 @@ export default function SettingsClient() {
   const [usage, setUsage] = useState({
     analyses: 0,
     reports: 0,
+  })
+
+  const [enabledAssistants, setEnabledAssistants] = useState<string[]>([
+    "ChatGPT",
+    "Claude",
+    "Gemini",
+    "Perplexity",
+    "Copilot",
+  ])
+
+  const [selectedMarkets, setSelectedMarkets] = useState<string[]>(["North America", "Europe"])
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(["English (EN)"])
+
+  const [activeThemes, setActiveThemes] = useState<string[]>([
+    "Performance & training",
+    "Lifestyle & culture",
+    "Sustainability",
+  ])
+
+  const [alertPrefs, setAlertPrefs] = useState({
+    scoreDrops: true,
+    highThreatCompetitors: true,
+    milestones: true,
+    weeklySummary: false,
+  })
+
+  const [deliveryChannels, setDeliveryChannels] = useState({
+    email: true,
+    inApp: true,
+    slack: false,
   })
 
   useEffect(() => {
@@ -278,6 +315,41 @@ export default function SettingsClient() {
     { id: "billing" as const, label: "Billing", icon: CreditCard },
   ]
 
+  const aiAssistants = [
+    { name: "ChatGPT", description: "General-purpose AI assistant by OpenAI" },
+    { name: "Claude", description: "Conversational AI by Anthropic" },
+    { name: "Gemini", description: "Multimodal AI by Google" },
+    { name: "Perplexity", description: "Search-centric AI assistant" },
+    { name: "Copilot", description: "Microsoft AI assistant" },
+  ]
+
+  const markets = ["North America", "Latin America", "Europe", "APAC"]
+  const languages = ["English (EN)", "Spanish (ES)", "Portuguese (PT)"]
+  const brandThemes = [
+    "Performance & training",
+    "Lifestyle & culture",
+    "Sustainability",
+    "Pricing & discounts",
+    "Community & creators",
+    "Customer support",
+  ]
+
+  const toggleAssistant = (name: string) => {
+    setEnabledAssistants((prev) => (prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]))
+  }
+
+  const toggleMarket = (market: string) => {
+    setSelectedMarkets((prev) => (prev.includes(market) ? prev.filter((m) => m !== market) : [...prev, market]))
+  }
+
+  const toggleLanguage = (lang: string) => {
+    setSelectedLanguages((prev) => (prev.includes(lang) ? prev.filter((l) => l !== lang) : [...prev, lang]))
+  }
+
+  const toggleTheme = (theme: string) => {
+    setActiveThemes((prev) => (prev.includes(theme) ? prev.filter((t) => t !== theme) : [...prev, theme]))
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -375,6 +447,10 @@ export default function SettingsClient() {
                 />
               </div>
 
+              <p className="text-xs text-muted-foreground">
+                Your profile details are used to personalize AI reports and executive summaries in your workspace.
+              </p>
+
               <Button onClick={handleSaveProfile} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
                 {isSaving ? (
                   <>
@@ -457,9 +533,159 @@ export default function SettingsClient() {
         </div>
       )}
 
-      {/* Tracking Tab */}
       {activeTab === "tracking" && (
         <div className="space-y-6">
+          {/* Header */}
+          <div>
+            <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+              <Bot className="h-5 w-5 text-blue-500" />
+              AI Tracking
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Configure how AI assistants, markets, and themes are monitored for your brand. This is a preview-only
+              control center; your workspace admin can fully customize it in the production version.
+            </p>
+          </div>
+
+          {/* A) AI Assistants Monitored */}
+          <Card className="border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                AI assistants monitored
+              </CardTitle>
+              <CardDescription>
+                Choose which AI assistants are included in your visibility scans. This is local-only demo state.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {aiAssistants.map((assistant) => {
+                  const isEnabled = enabledAssistants.includes(assistant.name)
+                  return (
+                    <div
+                      key={assistant.name}
+                      className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
+                        isEnabled ? "border-blue-500/50 bg-blue-950/20" : "border-border bg-zinc-900/50"
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground">{assistant.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{assistant.description}</p>
+                        {!isEnabled && (
+                          <Badge variant="outline" className="mt-1 text-xs border-zinc-700 text-zinc-500">
+                            Off in this workspace
+                          </Badge>
+                        )}
+                      </div>
+                      <Switch
+                        checked={isEnabled}
+                        onCheckedChange={() => toggleAssistant(assistant.name)}
+                        className="ml-3"
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* B) Markets & Languages */}
+          <Card className="border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                Markets & languages
+              </CardTitle>
+              <CardDescription>Preview which regions and languages are prioritized in your AI scans.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <Label className="text-sm text-muted-foreground mb-3 block">Markets</Label>
+                <div className="flex flex-wrap gap-2">
+                  {markets.map((market) => {
+                    const isSelected = selectedMarkets.includes(market)
+                    return (
+                      <button
+                        key={market}
+                        onClick={() => toggleMarket(market)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                          isSelected
+                            ? "bg-blue-600 text-white"
+                            : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300"
+                        }`}
+                      >
+                        {market}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm text-muted-foreground mb-3 block">Languages</Label>
+                <div className="flex flex-wrap gap-2">
+                  {languages.map((lang) => {
+                    const isSelected = selectedLanguages.includes(lang)
+                    return (
+                      <button
+                        key={lang}
+                        onClick={() => toggleLanguage(lang)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                          isSelected
+                            ? "bg-blue-600 text-white"
+                            : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300"
+                        }`}
+                      >
+                        {lang}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Preview mode – selections here are not yet saved to your real workspace configuration.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* C) Brand Themes Being Monitored */}
+          <Card className="border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Brand themes being monitored
+              </CardTitle>
+              <CardDescription>Key narratives and topics that AI assistants associate with your brand.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {brandThemes.map((theme) => {
+                  const isActive = activeThemes.includes(theme)
+                  return (
+                    <button
+                      key={theme}
+                      onClick={() => toggleTheme(theme)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        isActive
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-transparent text-zinc-400 border-zinc-700 hover:border-zinc-500 hover:text-zinc-300"
+                      }`}
+                    >
+                      {theme}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Your AI reports and alerts will use these themes as the main lenses for SWOT and competitor analysis.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Keep existing Brand Configuration card */}
           <Card className="border-border bg-card">
             <CardHeader>
               <CardTitle className="text-foreground">Brand Configuration</CardTitle>
@@ -544,233 +770,166 @@ export default function SettingsClient() {
               </Button>
             </CardContent>
           </Card>
-
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-foreground flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Analysis Schedule
-              </CardTitle>
-              <CardDescription>Configure how often we analyze your brand</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <RadioGroup
-                value={tracking.frequency}
-                onValueChange={(value) => setTracking({ ...tracking, frequency: value })}
-                className="space-y-3"
-              >
-                <div className="flex items-center space-x-3 p-3 border border-border rounded-lg hover:bg-slate-800/50 cursor-pointer">
-                  <RadioGroupItem value="daily" id="daily" />
-                  <Label htmlFor="daily" className="flex-1 cursor-pointer">
-                    <span className="font-medium">Daily</span>
-                    <span className="block text-sm text-muted-foreground">Every day at 9:00 AM</span>
-                  </Label>
-                  <Badge className="bg-blue-600">Pro</Badge>
-                </div>
-                <div className="flex items-center space-x-3 p-3 border border-border rounded-lg hover:bg-slate-800/50 cursor-pointer">
-                  <RadioGroupItem value="weekly" id="weekly" />
-                  <Label htmlFor="weekly" className="flex-1 cursor-pointer">
-                    <span className="font-medium">Weekly</span>
-                    <span className="block text-sm text-muted-foreground">Every Monday at 9:00 AM</span>
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-3 p-3 border border-border rounded-lg hover:bg-slate-800/50 cursor-pointer">
-                  <RadioGroupItem value="monthly" id="monthly" />
-                  <Label htmlFor="monthly" className="flex-1 cursor-pointer">
-                    <span className="font-medium">Monthly</span>
-                    <span className="block text-sm text-muted-foreground">1st of each month at 9:00 AM</span>
-                  </Label>
-                </div>
-              </RadioGroup>
-
-              <Button onClick={handleSaveTracking} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
-                {isSaving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Save Schedule"
-                )}
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       )}
 
-      {/* Notifications Tab */}
       {activeTab === "notifications" && (
         <div className="space-y-6">
+          {/* Header */}
+          <div>
+            <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+              <Bell className="h-5 w-5 text-blue-500" />
+              Notification preferences
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Control how often you are notified about AI score changes, new threats, and milestones.
+            </p>
+          </div>
+
+          {/* A) Alert Types */}
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-foreground">Email Notifications</CardTitle>
-              <CardDescription>Choose what updates you receive via email</CardDescription>
+              <CardTitle className="text-foreground">Alert types</CardTitle>
+              <CardDescription>Choose which AI Radar alerts should trigger notifications.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-foreground">Email Notifications</p>
-                  <p className="text-sm text-muted-foreground">Receive notifications via email</p>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-zinc-900/50 transition-colors">
+                <div className="flex items-start gap-3">
+                  <TrendingDown className="h-5 w-5 text-red-400 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-foreground">Score drops</p>
+                    <p className="text-sm text-muted-foreground">
+                      Notify me when AI Brand Score drops by more than 5 points.
+                    </p>
+                  </div>
                 </div>
                 <Switch
-                  checked={notifications.emailEnabled}
-                  onCheckedChange={(checked) => setNotifications({ ...notifications, emailEnabled: checked })}
+                  checked={alertPrefs.scoreDrops}
+                  onCheckedChange={(checked) => setAlertPrefs({ ...alertPrefs, scoreDrops: checked })}
                 />
               </div>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-zinc-900/50 transition-colors">
+                <div className="flex items-start gap-3">
+                  <Users className="h-5 w-5 text-orange-400 mt-0.5" />
                   <div>
-                    <p className="font-medium text-foreground">Score Drop Alerts</p>
-                    <p className="text-sm text-muted-foreground">Get notified when your score drops</p>
+                    <p className="font-medium text-foreground">New high-threat competitors</p>
+                    <p className="text-sm text-muted-foreground">
+                      Notify me when a competitor becomes medium or high threat in AI visibility.
+                    </p>
                   </div>
-                  <Switch
-                    checked={notifications.scoreDropEnabled}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, scoreDropEnabled: checked })}
-                    disabled={!notifications.emailEnabled}
-                  />
                 </div>
-                {notifications.scoreDropEnabled && (
-                  <div className="ml-4 flex items-center gap-2">
-                    <Label className="text-sm text-muted-foreground">Alert when score drops by</Label>
-                    <Select
-                      value={notifications.scoreDropThreshold}
-                      onValueChange={(value) => setNotifications({ ...notifications, scoreDropThreshold: value })}
-                      disabled={!notifications.emailEnabled}
-                    >
-                      <SelectTrigger className="w-24 bg-background border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="3">3+</SelectItem>
-                        <SelectItem value="5">5+</SelectItem>
-                        <SelectItem value="10">10+</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <span className="text-sm text-muted-foreground">points</span>
-                  </div>
-                )}
+                <Switch
+                  checked={alertPrefs.highThreatCompetitors}
+                  onCheckedChange={(checked) => setAlertPrefs({ ...alertPrefs, highThreatCompetitors: checked })}
+                />
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-zinc-900/50 transition-colors">
+                <div className="flex items-start gap-3">
+                  <Target className="h-5 w-5 text-green-400 mt-0.5" />
                   <div>
-                    <p className="font-medium text-foreground">Competitor Alerts</p>
-                    <p className="text-sm text-muted-foreground">Get notified about competitor changes</p>
+                    <p className="font-medium text-foreground">Milestones</p>
+                    <p className="text-sm text-muted-foreground">
+                      Notify me when we hit key milestones like Share of Voice &gt; 40%.
+                    </p>
                   </div>
-                  <Switch
-                    checked={notifications.competitorEnabled}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, competitorEnabled: checked })}
-                    disabled={!notifications.emailEnabled}
-                  />
                 </div>
-                {notifications.competitorEnabled && (
-                  <div className="ml-4 flex items-center gap-2">
-                    <Label className="text-sm text-muted-foreground">Alert when competitor rises by</Label>
-                    <Select
-                      value={notifications.competitorThreshold}
-                      onValueChange={(value) => setNotifications({ ...notifications, competitorThreshold: value })}
-                      disabled={!notifications.emailEnabled}
-                    >
-                      <SelectTrigger className="w-24 bg-background border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="3">3+</SelectItem>
-                        <SelectItem value="5">5+</SelectItem>
-                        <SelectItem value="10">10+</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <span className="text-sm text-muted-foreground">points</span>
-                  </div>
-                )}
+                <Switch
+                  checked={alertPrefs.milestones}
+                  onCheckedChange={(checked) => setAlertPrefs({ ...alertPrefs, milestones: checked })}
+                />
               </div>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-zinc-900/50 transition-colors">
+                <div className="flex items-start gap-3">
+                  <FileText className="h-5 w-5 text-blue-400 mt-0.5" />
                   <div>
-                    <p className="font-medium text-foreground">Weekly Digest</p>
-                    <p className="text-sm text-muted-foreground">Receive a weekly summary</p>
+                    <p className="font-medium text-foreground">Weekly summary</p>
+                    <p className="text-sm text-muted-foreground">
+                      Send me a weekly recap of AI scores, threats, and key actions.
+                    </p>
                   </div>
-                  <Switch
-                    checked={notifications.weeklyDigest}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, weeklyDigest: checked })}
-                    disabled={!notifications.emailEnabled}
-                  />
                 </div>
-                {notifications.weeklyDigest && (
-                  <div className="ml-4 flex items-center gap-2">
-                    <Label className="text-sm text-muted-foreground">Send digest on</Label>
-                    <Select
-                      value={notifications.digestDay}
-                      onValueChange={(value) => setNotifications({ ...notifications, digestDay: value })}
-                      disabled={!notifications.emailEnabled}
-                    >
-                      <SelectTrigger className="w-32 bg-background border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="monday">Monday</SelectItem>
-                        <SelectItem value="tuesday">Tuesday</SelectItem>
-                        <SelectItem value="wednesday">Wednesday</SelectItem>
-                        <SelectItem value="thursday">Thursday</SelectItem>
-                        <SelectItem value="friday">Friday</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                <Switch
+                  checked={alertPrefs.weeklySummary}
+                  onCheckedChange={(checked) => setAlertPrefs({ ...alertPrefs, weeklySummary: checked })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* B) Delivery Channels */}
+          <Card className="border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-foreground">Delivery channels</CardTitle>
+              <CardDescription>Where do you want to receive AI Radar notifications?</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-zinc-900/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Mail className="h-5 w-5 text-zinc-400" />
+                  <p className="font-medium text-foreground">Email</p>
+                </div>
+                <Switch
+                  checked={deliveryChannels.email}
+                  onCheckedChange={(checked) => setDeliveryChannels({ ...deliveryChannels, email: checked })}
+                />
               </div>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-foreground">Quiet Hours</p>
-                    <p className="text-sm text-muted-foreground">Pause notifications during certain hours</p>
-                  </div>
-                  <Switch
-                    checked={notifications.quietHoursEnabled}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, quietHoursEnabled: checked })}
-                    disabled={!notifications.emailEnabled}
-                  />
+              <div className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-zinc-900/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <Smartphone className="h-5 w-5 text-zinc-400" />
+                  <p className="font-medium text-foreground">In-app</p>
                 </div>
-                {notifications.quietHoursEnabled && (
-                  <div className="ml-4 flex items-center gap-2">
-                    <Label className="text-sm text-muted-foreground">From</Label>
-                    <Input
-                      type="time"
-                      value={notifications.quietStart}
-                      onChange={(e) => setNotifications({ ...notifications, quietStart: e.target.value })}
-                      className="w-28 bg-background border-border"
-                      disabled={!notifications.emailEnabled}
-                    />
-                    <Label className="text-sm text-muted-foreground">to</Label>
-                    <Input
-                      type="time"
-                      value={notifications.quietEnd}
-                      onChange={(e) => setNotifications({ ...notifications, quietEnd: e.target.value })}
-                      className="w-28 bg-background border-border"
-                      disabled={!notifications.emailEnabled}
-                    />
-                  </div>
-                )}
+                <Switch
+                  checked={deliveryChannels.inApp}
+                  onCheckedChange={(checked) => setDeliveryChannels({ ...deliveryChannels, inApp: checked })}
+                />
               </div>
 
-              <Button onClick={handleSaveNotifications} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
-                {isSaving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Save Notification Settings"
-                )}
-              </Button>
+              <div className="flex items-center justify-between p-4 rounded-lg border border-zinc-800 bg-zinc-900/30">
+                <div className="flex items-center gap-3">
+                  <MessageSquare className="h-5 w-5 text-zinc-600" />
+                  <div>
+                    <p className="font-medium text-zinc-500">Slack</p>
+                    <Badge variant="outline" className="mt-1 text-xs border-zinc-700 text-zinc-500">
+                      Coming soon
+                    </Badge>
+                  </div>
+                </div>
+                <Switch checked={false} disabled />
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Workspace admins will be able to connect Slack in the full version.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* C) Test Notification */}
+          <Card className="border-border bg-card">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-foreground">Want to see how this feels?</p>
+                  <p className="text-sm text-muted-foreground">
+                    Send yourself a test notification with your current settings.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="border-border bg-transparent"
+                  onClick={() => {
+                    alert(
+                      "This is a demo. In the full version, AI Radar would send a notification based on your preferences.",
+                    )
+                  }}
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  Send test notification
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
