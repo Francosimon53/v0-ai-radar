@@ -115,13 +115,7 @@ export default function SettingsClient() {
     reports: 0,
   })
 
-  const [enabledAssistants, setEnabledAssistants] = useState<string[]>([
-    "ChatGPT",
-    "Claude",
-    "Gemini",
-    "Perplexity",
-    "Copilot",
-  ])
+  const [enabledAssistants, setEnabledAssistants] = useState<string[]>(["ChatGPT", "Claude"])
 
   const [selectedMarkets, setSelectedMarkets] = useState<string[]>(["North America", "Europe"])
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(["English (EN)"])
@@ -316,11 +310,11 @@ export default function SettingsClient() {
   ]
 
   const aiAssistants = [
-    { name: "ChatGPT", description: "General-purpose AI assistant by OpenAI" },
-    { name: "Claude", description: "Conversational AI by Anthropic" },
-    { name: "Gemini", description: "Multimodal AI by Google" },
-    { name: "Perplexity", description: "Search-centric AI assistant" },
-    { name: "Copilot", description: "Microsoft AI assistant" },
+    { name: "ChatGPT", description: "General-purpose AI assistant by OpenAI", status: "live" as const },
+    { name: "Claude", description: "Conversational AI by Anthropic", status: "live" as const },
+    { name: "Gemini", description: "Multimodal AI by Google", status: "coming-soon" as const },
+    { name: "Perplexity", description: "Search-centric AI assistant", status: "coming-soon" as const },
+    { name: "Copilot", description: "Microsoft AI assistant", status: "coming-soon" as const },
   ]
 
   const markets = ["North America", "Latin America", "Europe", "APAC"]
@@ -542,8 +536,9 @@ export default function SettingsClient() {
               AI Tracking
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Configure how AI assistants, markets, and themes are monitored for your brand. This is a preview-only
-              control center; your workspace admin can fully customize it in the production version.
+              Configure which AI assistants are monitored for your brand. Only assistants marked as{" "}
+              <span className="text-emerald-400 font-medium">Live</span> are actively queried during real analyses and
+              included in your VIP reports.
             </p>
           </div>
 
@@ -554,39 +549,56 @@ export default function SettingsClient() {
                 <MessageSquare className="h-5 w-5" />
                 AI assistants monitored
               </CardTitle>
-              <CardDescription>
-                Choose which AI assistants are included in your visibility scans. This is local-only demo state.
-              </CardDescription>
+              <CardDescription>Select which AI assistants to include in your visibility scans.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {aiAssistants.map((assistant) => {
+                  const isLive = assistant.status === "live"
                   const isEnabled = enabledAssistants.includes(assistant.name)
                   return (
                     <div
                       key={assistant.name}
                       className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
-                        isEnabled ? "border-blue-500/50 bg-blue-950/20" : "border-border bg-zinc-900/50"
+                        isLive && isEnabled
+                          ? "border-blue-500/50 bg-blue-950/20"
+                          : isLive
+                            ? "border-border bg-zinc-900/50"
+                            : "border-zinc-800/50 bg-zinc-900/30 opacity-70"
                       }`}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground">{assistant.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{assistant.description}</p>
-                        {!isEnabled && (
-                          <Badge variant="outline" className="mt-1 text-xs border-zinc-700 text-zinc-500">
-                            Off in this workspace
-                          </Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-foreground">{assistant.name}</p>
+                          {/* Status badge */}
+                          {isLive ? (
+                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px] px-1.5 py-0">
+                              Live
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-zinc-700 text-zinc-500 text-[10px] px-1.5 py-0">
+                              Coming soon
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{assistant.description}</p>
                       </div>
+                      {/* Toggle - disabled for coming-soon assistants */}
                       <Switch
-                        checked={isEnabled}
-                        onCheckedChange={() => toggleAssistant(assistant.name)}
-                        className="ml-3"
+                        checked={isLive ? isEnabled : false}
+                        onCheckedChange={() => isLive && toggleAssistant(assistant.name)}
+                        disabled={!isLive}
+                        className={`ml-3 ${!isLive ? "opacity-40 cursor-not-allowed" : ""}`}
                       />
                     </div>
                   )
                 })}
               </div>
+              <p className="text-xs text-muted-foreground pt-2 border-t border-zinc-800/50">
+                Only assistants marked as <span className="text-emerald-400">Live</span> are currently included in AI
+                Brand Score, SWOT analysis, and 90/30/7-day action plans.{" "}
+                <span className="text-zinc-500">Coming soon</span> assistants are preview-only for now.
+              </p>
             </CardContent>
           </Card>
 
