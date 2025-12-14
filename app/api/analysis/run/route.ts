@@ -55,58 +55,38 @@ export async function POST(request: NextRequest) {
       console.log("[v0] Any config from tracking_configs:", data ? "found" : "not found", error?.message)
     }
 
-    if (!config) {
-      const { data, error } = await supabaseAdmin
-        .from("brand_configs")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single()
-
-      if (data) {
-        config = {
-          id: data.id,
-          primary_brand: data.brand_name,
-          competitors: data.competitors || [],
-          industry: data.industry || "general",
-        }
-        actualConfigId = data.id
-        console.log("[v0] Found config from brand_configs:", data.brand_name)
-      } else {
-        console.log("[v0] No brand_configs found either:", error?.message)
-      }
-    }
-
     if (!config || !actualConfigId) {
-      console.log("[v0] Creating default brand_config for user")
+      console.log("[v0] Creating default tracking_config for user")
       const { data: newConfig, error: createError } = await supabaseAdmin
-        .from("brand_configs")
+        .from("tracking_configs")
         .insert({
           user_id: user.id,
-          brand_name: "My Brand",
+          primary_brand: "My Brand",
           industry: "general",
           competitors: [],
+          ai_assistants: ["chatgpt", "claude"],
+          regions: ["north-america"],
+          languages: ["en"],
         })
         .select("*")
         .single()
 
       if (createError || !newConfig) {
-        console.error("[v0] Failed to create brand_config:", createError)
+        console.error(
+          "[v0] Failed to create tracking_config:",
+          createError?.message,
+          createError?.details,
+          createError?.hint,
+        )
         return NextResponse.json(
-          { error: "Failed to create brand configuration", details: createError?.message },
+          { error: "Failed to create tracking configuration", details: createError?.message },
           { status: 500 },
         )
       }
 
-      config = {
-        id: newConfig.id,
-        primary_brand: newConfig.brand_name,
-        competitors: newConfig.competitors || [],
-        industry: newConfig.industry || "general",
-      }
+      config = newConfig
       actualConfigId = newConfig.id
-      console.log("[v0] Created brand_config with ID:", actualConfigId)
+      console.log("[v0] Created tracking_config with ID:", actualConfigId)
     }
 
     const brandName = config.primary_brand || config.brand_name || config.name || "Unknown Brand"
@@ -219,7 +199,10 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Report saved successfully with ID:", report.id)
 
     // Update last run timestamp
-    await supabaseAdmin.from("brand_configs").update({ updated_at: new Date().toISOString() }).eq("id", actualConfigId)
+    await supabaseAdmin
+      .from("tracking_configs")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", actualConfigId)
 
     return NextResponse.json({
       success: true,
