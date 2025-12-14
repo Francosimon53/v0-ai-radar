@@ -56,8 +56,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (!config || !actualConfigId) {
-      console.log("[v0] Creating default brand_config for user")
-      const { data: newConfig, error: createError } = await supabaseAdmin
+      console.log("[v0] Creating default brand_config for user:", user.id)
+
+      // The admin client bypasses RLS but FK constraints still apply
+      // Using the user's client ensures proper auth context
+      const { data: newConfig, error: createError } = await supabase
         .from("brand_configs")
         .insert({
           user_id: user.id,
@@ -69,21 +72,37 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (createError || !newConfig) {
-        console.error(
-          "[v0] Failed to create brand_config:",
-          createError?.message,
-          createError?.details,
-          createError?.hint,
-        )
-        return NextResponse.json(
-          { error: "Failed to create brand configuration", details: createError?.message },
-          { status: 500 },
-        )
-      }
+        console.error("[v0] Failed to create brand_config:")
+        console.error("[v0] Error message:", createError?.message)
+        console.error("[v0] Error code:", createError?.code)
+        console.error("[v0] Error details:", JSON.stringify(createError, null, 2))
 
-      config = newConfig
-      actualConfigId = newConfig.id
-      console.log("[v0] Created brand_config with ID:", actualConfigId)
+        const { data: retryConfig, error: retryError } = await supabase
+          .from("brand_configs")
+          .insert({
+            brand_name: "My Brand",
+            industry: "general",
+            competitors: [],
+          })
+          .select("*")
+          .single()
+
+        if (retryError || !retryConfig) {
+          console.error("[v0] Retry also failed:", retryError?.message)
+          return NextResponse.json(
+            { error: "Failed to create brand configuration", details: createError?.message },
+            { status: 500 },
+          )
+        }
+
+        config = retryConfig
+        actualConfigId = retryConfig.id
+        console.log("[v0] Retry succeeded with ID:", actualConfigId)
+      } else {
+        config = newConfig
+        actualConfigId = newConfig.id
+        console.log("[v0] Created brand_config with ID:", actualConfigId)
+      }
     }
 
     const brandName = config.brand_name || config.primary_brand || config.name || "Unknown Brand"
