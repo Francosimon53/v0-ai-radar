@@ -96,15 +96,14 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
     setIsRunning(true)
 
     try {
-      const result = await runBrandAnalysis(dashboardData?.configId || undefined)
+      const reportId = await runBrandAnalysis(dashboardData?.configId || undefined)
 
       // Refresh dashboard metrics
       router.refresh()
 
       // Navigate to the new report
-      router.push(`/dashboard/reports/${result.analysisId}`)
+      router.push(`/dashboard/reports/${reportId}`)
     } catch (error) {
-      console.error("[v0] Run analysis error:", error)
       setRunError(error instanceof Error ? error.message : "Analysis failed. Please try again.")
     } finally {
       setIsRunning(false)
@@ -258,7 +257,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
                 <Button
                   onClick={handleRunAnalysis}
                   disabled={isRunning}
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-700"
                   size="sm"
                 >
                   {isRunning ? (
