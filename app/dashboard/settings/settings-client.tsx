@@ -11,14 +11,6 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   User,
@@ -31,10 +23,7 @@ import {
   AlertTriangle,
   Download,
   Trash2,
-  Zap,
   Lock,
-  FileText,
-  CheckCircle,
   Loader2,
   Bot,
   Globe,
@@ -43,8 +32,6 @@ import {
   Users,
   Target,
   Mail,
-  Smartphone,
-  Send,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
@@ -115,10 +102,8 @@ export default function SettingsClient() {
     reports: 0,
   })
 
-  const [enabledAssistants, setEnabledAssistants] = useState<string[]>(["ChatGPT", "Claude"])
-
-  const [selectedMarkets, setSelectedMarkets] = useState<string[]>(["North America", "Europe"])
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(["English (EN)"])
+  const [selectedMarkets, setSelectedMarkets] = useState<string[]>(["North America", "Latin America"])
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(["English", "Spanish"])
 
   const [activeThemes, setActiveThemes] = useState<string[]>([
     "Performance & training",
@@ -138,6 +123,8 @@ export default function SettingsClient() {
     inApp: true,
     slack: false,
   })
+
+  const [enabledAssistants, setEnabledAssistants] = useState<string[]>([])
 
   useEffect(() => {
     async function loadSettings() {
@@ -317,8 +304,8 @@ export default function SettingsClient() {
     { name: "Copilot", description: "Microsoft AI assistant", status: "coming-soon" as const },
   ]
 
-  const markets = ["North America", "Latin America", "Europe", "APAC"]
-  const languages = ["English (EN)", "Spanish (ES)", "Portuguese (PT)"]
+  const markets = ["North America", "Latin America", "Europe", "Asia–Pacific", "Middle East & Africa"]
+  const languages = ["English", "Spanish", "Portuguese", "French"]
   const brandThemes = [
     "Performance & training",
     "Lifestyle & culture",
@@ -609,11 +596,15 @@ export default function SettingsClient() {
                 <Globe className="h-5 w-5" />
                 Markets & languages
               </CardTitle>
-              <CardDescription>Preview which regions and languages are prioritized in your AI scans.</CardDescription>
+              <CardDescription className="leading-relaxed">
+                Preview which regions and languages are prioritized in your AI scans. In the full version, these
+                settings control where we search and in which languages we analyse AI responses about your brand.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div>
-                <Label className="text-sm text-muted-foreground mb-3 block">Markets</Label>
+              {/* Markets Card */}
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+                <Label className="text-sm font-medium text-foreground mb-3 block">Markets</Label>
                 <div className="flex flex-wrap gap-2">
                   {markets.map((market) => {
                     const isSelected = selectedMarkets.includes(market)
@@ -634,22 +625,29 @@ export default function SettingsClient() {
                 </div>
               </div>
 
-              <div>
-                <Label className="text-sm text-muted-foreground mb-3 block">Languages</Label>
+              {/* Languages Card */}
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+                <Label className="text-sm font-medium text-foreground mb-3 block">Languages</Label>
                 <div className="flex flex-wrap gap-2">
                   {languages.map((lang) => {
                     const isSelected = selectedLanguages.includes(lang)
+                    const isPrimary = lang === "English"
                     return (
                       <button
                         key={lang}
                         onClick={() => toggleLanguage(lang)}
-                        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 ${
                           isSelected
                             ? "bg-blue-600 text-white"
                             : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300"
                         }`}
                       >
                         {lang}
+                        {isPrimary && isSelected && (
+                          <span className="text-[10px] uppercase tracking-wider bg-blue-500/30 px-1.5 py-0.5 rounded">
+                            Primary
+                          </span>
+                        )}
                       </button>
                     )
                   })}
@@ -657,7 +655,8 @@ export default function SettingsClient() {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Preview mode – selections here are not yet saved to your real workspace configuration.
+                In the production version, these preferences will influence AI Brand Score, SWOT insights and action
+                plans for each market.
               </p>
             </CardContent>
           </Card>
@@ -843,7 +842,7 @@ export default function SettingsClient() {
                   <div>
                     <p className="font-medium text-foreground">Milestones</p>
                     <p className="text-sm text-muted-foreground">
-                      Notify me when we hit key milestones like Share of Voice &gt; 40%.
+                      Notify me when your brand reaches important milestones.
                     </p>
                   </div>
                 </div>
@@ -855,12 +854,10 @@ export default function SettingsClient() {
 
               <div className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-zinc-900/50 transition-colors">
                 <div className="flex items-start gap-3">
-                  <FileText className="h-5 w-5 text-blue-400 mt-0.5" />
+                  <Mail className="h-5 w-5 text-blue-400 mt-0.5" />
                   <div>
                     <p className="font-medium text-foreground">Weekly summary</p>
-                    <p className="text-sm text-muted-foreground">
-                      Send me a weekly recap of AI scores, threats, and key actions.
-                    </p>
+                    <p className="text-sm text-muted-foreground">Receive a weekly summary of AI insights and alerts.</p>
                   </div>
                 </div>
                 <Switch
@@ -868,182 +865,116 @@ export default function SettingsClient() {
                   onCheckedChange={(checked) => setAlertPrefs({ ...alertPrefs, weeklySummary: checked })}
                 />
               </div>
-            </CardContent>
-          </Card>
 
-          {/* B) Delivery Channels */}
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-foreground">Delivery channels</CardTitle>
-              <CardDescription>Where do you want to receive AI Radar notifications?</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-zinc-900/50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <Mail className="h-5 w-5 text-zinc-400" />
-                  <p className="font-medium text-foreground">Email</p>
-                </div>
-                <Switch
-                  checked={deliveryChannels.email}
-                  onCheckedChange={(checked) => setDeliveryChannels({ ...deliveryChannels, email: checked })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-zinc-900/50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <Smartphone className="h-5 w-5 text-zinc-400" />
-                  <p className="font-medium text-foreground">In-app</p>
-                </div>
-                <Switch
-                  checked={deliveryChannels.inApp}
-                  onCheckedChange={(checked) => setDeliveryChannels({ ...deliveryChannels, inApp: checked })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-lg border border-zinc-800 bg-zinc-900/30">
-                <div className="flex items-center gap-3">
-                  <MessageSquare className="h-5 w-5 text-zinc-600" />
-                  <div>
-                    <p className="font-medium text-zinc-500">Slack</p>
-                    <Badge variant="outline" className="mt-1 text-xs border-zinc-700 text-zinc-500">
-                      Coming soon
-                    </Badge>
-                  </div>
-                </div>
-                <Switch checked={false} disabled />
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                Workspace admins will be able to connect Slack in the full version.
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* C) Test Notification */}
-          <Card className="border-border bg-card">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-foreground">Want to see how this feels?</p>
-                  <p className="text-sm text-muted-foreground">
-                    Send yourself a test notification with your current settings.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  className="border-border bg-transparent"
-                  onClick={() => {
-                    alert(
-                      "This is a demo. In the full version, AI Radar would send a notification based on your preferences.",
-                    )
-                  }}
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  Send test notification
-                </Button>
-              </div>
+              <Button onClick={handleSaveNotifications} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Notification Settings"
+                )}
+              </Button>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Billing Tab */}
       {activeTab === "billing" && (
         <div className="space-y-6">
+          {/* Plan Information */}
           <Card className="border-border bg-card">
             <CardHeader>
+              <CardTitle className="text-foreground">Current Plan</CardTitle>
+              <CardDescription>Details of your current subscription plan</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-foreground">Current Plan</CardTitle>
-                  <CardDescription>Manage your subscription</CardDescription>
-                </div>
-                <Badge className="bg-blue-600 text-white">{planData.name}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-bold text-foreground">${planData.price}</span>
-                <span className="text-muted-foreground">/{planData.billingCycle}</span>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-muted-foreground">Analyses</span>
-                    <span className="text-foreground">
-                      {usage.analyses} / {planData.limits.analyses}
-                    </span>
-                  </div>
-                  <Progress value={(usage.analyses / planData.limits.analyses) * 100} className="h-2" />
+                  <p className="font-medium text-foreground">Plan Name</p>
+                  <p className="text-sm text-muted-foreground">{planData.name}</p>
                 </div>
                 <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-muted-foreground">Reports Generated</span>
-                    <span className="text-foreground">{usage.reports}</span>
+                  <p className="font-medium text-foreground">Price</p>
+                  <p className="text-sm text-muted-foreground">
+                    ${planData.price} / {planData.billingCycle}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-foreground">Next Billing</p>
+                  <p className="text-sm text-muted-foreground">{planData.nextBilling}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">Usage Limits</p>
+                  <div className="text-sm text-muted-foreground">
+                    <p>Brands: {planData.limits.brands}</p>
+                    <p>Competitors: {planData.limits.competitors}</p>
+                    <p>Analyses: {planData.limits.analyses}</p>
                   </div>
                 </div>
               </div>
-
-              <div className="flex gap-3">
-                <Button onClick={() => setShowUpgradeDialog(true)} className="bg-blue-600 hover:bg-blue-700">
-                  <Zap className="mr-2 h-4 w-4" />
-                  Upgrade Plan
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCancelDialog(true)}
-                  className="border-border text-muted-foreground hover:text-foreground"
-                >
-                  Cancel Plan
-                </Button>
-              </div>
-
-              <p className="text-sm text-muted-foreground">Next billing date: {planData.nextBilling}</p>
+              <Button
+                variant="outline"
+                onClick={() => setShowUpgradeDialog(true)}
+                className="border-border bg-transparent"
+              >
+                Upgrade Plan
+              </Button>
             </CardContent>
           </Card>
 
+          {/* Usage Statistics */}
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-foreground flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Billing History
-              </CardTitle>
-              <CardDescription>View and download past invoices</CardDescription>
+              <CardTitle className="text-foreground">Usage Statistics</CardTitle>
+              <CardDescription>Your current usage of AI services</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-foreground">Analyses Completed</p>
+                  <p className="text-sm text-muted-foreground">{usage.analyses}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">Reports Generated</p>
+                  <p className="text-sm text-muted-foreground">{usage.reports}</p>
+                </div>
+              </div>
+              <Progress value={Math.min((usage.analyses / planData.limits.analyses) * 100, 100)} />
+            </CardContent>
+          </Card>
+
+          {/* Invoice History */}
+          <Card className="border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-foreground">Invoice History</CardTitle>
+              <CardDescription>View your past invoices</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-border">
-                    <TableHead className="text-muted-foreground">Invoice</TableHead>
-                    <TableHead className="text-muted-foreground">Date</TableHead>
-                    <TableHead className="text-muted-foreground">Amount</TableHead>
-                    <TableHead className="text-muted-foreground">Status</TableHead>
-                    <TableHead className="text-right text-muted-foreground">Action</TableHead>
+                  <TableRow>
+                    <TableHead className="w-[100px]">Invoice ID</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {invoiceHistory.map((invoice) => (
-                    <TableRow key={invoice.id} className="border-border">
-                      <TableCell className="font-medium text-foreground">{invoice.id}</TableCell>
-                      <TableCell className="text-muted-foreground">{invoice.date}</TableCell>
-                      <TableCell className="text-foreground">${invoice.amount}</TableCell>
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-medium">{invoice.id}</TableCell>
+                      <TableCell>{invoice.date}</TableCell>
+                      <TableCell>${invoice.amount}</TableCell>
                       <TableCell>
                         <Badge
-                          variant="secondary"
-                          className={
-                            invoice.status === "paid"
-                              ? "bg-green-900/30 text-green-400"
-                              : "bg-yellow-900/30 text-yellow-400"
-                          }
+                          className={`bg-${invoice.status === "paid" ? "emerald-500" : "red-500"}/20 text-${invoice.status === "paid" ? "emerald-400" : "red-400"} border-${invoice.status === "paid" ? "emerald-500" : "red-500"}/30 text-[10px] px-1.5 py-0`}
                         >
-                          <CheckCircle className="mr-1 h-3 w-3" />
                           {invoice.status}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300">
-                          <Download className="h-4 w-4" />
-                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1053,71 +984,6 @@ export default function SettingsClient() {
           </Card>
         </div>
       )}
-
-      {/* Delete Account Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="text-red-500">Delete Account</DialogTitle>
-            <DialogDescription>
-              This action cannot be undone. All your data will be permanently deleted.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              Type <span className="font-mono text-foreground">DELETE</span> to confirm:
-            </p>
-            <Input className="bg-background border-border" placeholder="Type DELETE" />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} className="border-border">
-              Cancel
-            </Button>
-            <Button variant="destructive" className="bg-red-600 hover:bg-red-700">
-              Delete Account
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Cancel Plan Dialog */}
-      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <DialogContent className="bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Cancel Subscription</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to cancel your subscription? You&apos;ll lose access to premium features.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCancelDialog(false)} className="border-border">
-              Keep Plan
-            </Button>
-            <Button variant="destructive" className="bg-red-600 hover:bg-red-700">
-              Cancel Plan
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Upgrade Dialog */}
-      <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
-        <DialogContent className="bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Upgrade Your Plan</DialogTitle>
-            <DialogDescription>Get access to more features and higher limits.</DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground">Contact our sales team to discuss enterprise options.</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUpgradeDialog(false)} className="border-border">
-              Cancel
-            </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700">Contact Sales</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
