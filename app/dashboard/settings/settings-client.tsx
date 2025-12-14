@@ -793,15 +793,18 @@ export default function SettingsClient() {
               Notification preferences
             </h2>
             <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-              Choose which AI events should trigger alerts and how you'd like to be notified. In this demo, settings are
-              local-only, but the full version will sync these preferences with your workspace.
+              Control which AI events trigger alerts and how you want to be notified. These settings are designed for
+              marketing and growth teams that rely on AI visibility as an early-warning system.
             </p>
           </div>
 
           <Card className="border-border bg-card">
             <CardHeader className="pb-3">
               <CardTitle className="text-foreground text-base">Channels</CardTitle>
-              <CardDescription>How you receive notifications</CardDescription>
+              <CardDescription>
+                Choose which channels we should use to deliver AI alerts and executive summaries. In this demo, channels
+                are visual only, but the full version will sync with your workspace tools.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3">
@@ -813,11 +816,13 @@ export default function SettingsClient() {
                     </div>
                     <div>
                       <p className="font-medium text-foreground text-sm">Email</p>
-                      <p className="text-xs text-muted-foreground">Executive summaries & critical alerts</p>
+                      <p className="text-xs text-muted-foreground">
+                        Executive summaries, weekly digests and critical incidents.
+                      </p>
                     </div>
                   </div>
                   <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/30">
-                    Enabled
+                    Live
                   </Badge>
                 </div>
 
@@ -831,11 +836,11 @@ export default function SettingsClient() {
                     </div>
                     <div>
                       <p className="font-medium text-foreground text-sm">Slack</p>
-                      <p className="text-xs text-muted-foreground">Real-time alerts to your workspace</p>
+                      <p className="text-xs text-muted-foreground">Real-time alerts inside your team channels.</p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="bg-zinc-500/10 text-zinc-400 border-zinc-500/30">
-                    Coming soon
+                  <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/30">
+                    Connected
                   </Badge>
                 </div>
 
@@ -849,7 +854,9 @@ export default function SettingsClient() {
                     </div>
                     <div>
                       <p className="font-medium text-foreground text-sm">WhatsApp</p>
-                      <p className="text-xs text-muted-foreground">Mobile alerts for urgent events</p>
+                      <p className="text-xs text-muted-foreground">
+                        Urgent, on-the-go alerts for key stakeholders. (Coming soon)
+                      </p>
                     </div>
                   </div>
                   <Badge variant="outline" className="bg-zinc-500/10 text-zinc-400 border-zinc-500/30">
@@ -863,7 +870,6 @@ export default function SettingsClient() {
           <Card className="border-border bg-card">
             <CardHeader className="pb-3">
               <CardTitle className="text-foreground text-base">Alert types</CardTitle>
-              <CardDescription>Choose which AI Radar events should trigger notifications.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {/* Score Drops */}
@@ -871,11 +877,11 @@ export default function SettingsClient() {
                 <div className="flex items-start gap-3">
                   <TrendingDown className="h-5 w-5 text-red-400 mt-0.5" />
                   <div>
-                    <p className="font-medium text-foreground">Score Drops</p>
+                    <p className="font-medium text-foreground">Score drops</p>
                     <p className="text-sm text-muted-foreground">
-                      Notify me when my AI Brand Score drops by a significant margin vs the last scan.
+                      Notify me when my AI Brand Score drops by a meaningful margin compared to the last scan. For
+                      example: −5 points or more within 7 days.
                     </p>
-                    <p className="text-xs text-zinc-500 mt-1 italic">Example: −5 points or more within 7 days.</p>
                   </div>
                 </div>
                 <Switch
@@ -889,11 +895,11 @@ export default function SettingsClient() {
                 <div className="flex items-start gap-3">
                   <Users className="h-5 w-5 text-orange-400 mt-0.5" />
                   <div>
-                    <p className="font-medium text-foreground">Competitor Surges</p>
+                    <p className="font-medium text-foreground">Competitor surges</p>
                     <p className="text-sm text-muted-foreground">
-                      Alert me when a tracked competitor gains AI visibility or overtakes my brand.
+                      Alert me when a tracked competitor gains AI visibility or overtakes my brand in AI Brand Score or
+                      Share of Voice.
                     </p>
-                    <p className="text-xs text-zinc-500 mt-1 italic">Relates to AI Score and Share of Voice changes.</p>
                   </div>
                 </div>
                 <Switch
@@ -909,7 +915,8 @@ export default function SettingsClient() {
                   <div>
                     <p className="font-medium text-foreground">Milestones</p>
                     <p className="text-sm text-muted-foreground">
-                      Celebrate key milestones such as new high scores or major share-of-voice wins.
+                      Celebrate key milestones such as new all-time-high scores, major share-of-voice wins or positive
+                      shifts in sentiment.
                     </p>
                   </div>
                 </div>
@@ -924,9 +931,10 @@ export default function SettingsClient() {
                 <div className="flex items-start gap-3">
                   <Mail className="h-5 w-5 text-blue-400 mt-0.5" />
                   <div>
-                    <p className="font-medium text-foreground">Weekly Executive Digest</p>
+                    <p className="font-medium text-foreground">Weekly executive digest</p>
                     <p className="text-sm text-muted-foreground">
-                      Send a weekly summary of AI Brand Score, key threats and opportunities.
+                      Send a weekly summary of AI Brand Score, key threats, new opportunities and recommended next
+                      actions.
                     </p>
                   </div>
                 </div>
@@ -948,7 +956,9 @@ export default function SettingsClient() {
             <CardContent>
               <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-zinc-900/30">
                 <div>
-                  <p className="font-medium text-foreground text-sm">Pause non-critical alerts</p>
+                  <p className="font-medium text-foreground text-sm">
+                    Pause non-critical alerts during night-time so your team is only interrupted for what truly matters.
+                  </p>
                   <p className="text-xs text-muted-foreground mt-0.5">22:00 – 07:00 (local time)</p>
                 </div>
                 <Badge variant="outline" className="bg-zinc-500/10 text-zinc-400 border-zinc-500/30">
@@ -956,14 +966,14 @@ export default function SettingsClient() {
                 </Badge>
               </div>
               <p className="text-xs text-zinc-500 mt-3">
-                In the full version, you'll be able to pause non-critical alerts during these hours.
+                In the full version, you'll be able to customize these hours per workspace or per user.
               </p>
             </CardContent>
           </Card>
 
           <p className="text-xs text-zinc-500 text-center pt-2">
-            Note: This is a demo workspace. Notification settings are preview-only and do not send real emails or
-            messages yet.
+            Note: This is a demo workspace. Notification settings are preview-only and do not send real emails, Slack
+            messages or WhatsApp alerts yet.
           </p>
         </div>
       )}
