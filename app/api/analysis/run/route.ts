@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
         models_queried: result.modelBreakdown.map((m) => m.model),
         status: "completed",
       })
-      .select("id")
+      .select("*")
       .single()
 
     if (insertError) {
@@ -151,8 +151,8 @@ export async function POST(request: NextRequest) {
 
     const response = {
       success: true,
-      analysisId: reportId,
-      reportId: reportId,
+      reportId: report.id,
+      report,
       brandScore: result.brandScore,
       shareOfVoice: result.shareOfVoice,
       sentiment: result.sentiment,
