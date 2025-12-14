@@ -1,6 +1,6 @@
 "use client"
 
-// v4.0 - Premium UX upgrade
+// v4.1 - Connected to real backend
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -21,8 +21,8 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-// import { VIPReportModal } from "@/components/vip-report-modal"
-// import { runBrandAnalysis } from "@/lib/analysis/run-brand-analysis"
+import { VIPReportModal } from "@/components/vip-report-modal"
+import { runBrandAnalysis } from "@/lib/analysis/run-brand-analysis"
 
 interface DashboardData {
   hasConfig: boolean
@@ -63,6 +63,8 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(initialData)
   const [loading, setLoading] = useState(!initialData)
   const [isRunning, setIsRunning] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
+  const [isVIPModalOpen, setIsVIPModalOpen] = useState(false) // Declare isVIPModalOpen and setIsVIPModalOpen
   const router = useRouter()
 
   useEffect(() => {
@@ -90,22 +92,21 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
   async function handleRunAnalysis() {
     if (isRunning) return
 
-    // setRunError(null)
+    setRunError(null)
     setIsRunning(true)
 
     try {
-      // const result = await runBrandAnalysis(dashboardData?.configId)
+      const result = await runBrandAnalysis(dashboardData?.configId || undefined)
 
       // Refresh dashboard metrics
-      // router.refresh()
+      router.refresh()
 
       // Navigate to the new report
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      router.push("/dashboard/reports/sample")
-      setIsRunning(false)
+      router.push(`/dashboard/reports/${result.analysisId}`)
     } catch (error) {
       console.error("[v0] Run analysis error:", error)
-      // setRunError(error instanceof Error ? error.message : "Analysis failed. Please try again.")
+      setRunError(error instanceof Error ? error.message : "Analysis failed. Please try again.")
+    } finally {
       setIsRunning(false)
     }
   }
@@ -137,10 +138,10 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
 
   return (
     <div className="space-y-8">
-      {/* <VIPReportModal isOpen={isVIPModalOpen} onClose={() => setIsVIPModalOpen(false)} /> */}
+      <VIPReportModal isOpen={isVIPModalOpen} onClose={() => setIsVIPModalOpen(false)} />
 
       <div className="fixed bottom-4 right-4 z-50 rounded-md bg-zinc-900 px-3 py-1.5 text-xs text-zinc-500 border border-zinc-800">
-        v4.0
+        v4.1
       </div>
 
       <div className="rounded-xl border border-blue-500/20 bg-gradient-to-br from-blue-950/30 via-zinc-900 to-zinc-950 p-8">
@@ -180,7 +181,7 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
               Preview VIP AI brand report
             </Button>
           </div>
-          {/* <p className="mt-3 text-sm text-red-400">{runError}</p> */}
+          {runError && <p className="mt-3 text-sm text-red-400">{runError}</p>}
           <p className="text-xs text-zinc-500 mt-4">
             Preview mode – this analysis uses example data only. Your workspace admin can enable live AI scans in the
             full version.
