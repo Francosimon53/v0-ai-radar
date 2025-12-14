@@ -131,3 +131,126 @@
 .glow-warning {
   box-shadow: 0 0 20px rgba(250, 200, 100, 0.15);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Print Styles for VIP AI Brand Report
+   ───────────────────────────────────────────────────────────────────────────── */
+@media print {
+  /* Hide everything except the report */
+  body > *:not(.ai-report-print-area),
+  header,
+  nav,
+  aside,
+  footer,
+  .sidebar,
+  .print\:hidden,
+  [data-sidebar],
+  [data-radix-popper-content-wrapper] {
+    display: none !important;
+  }
+
+  /* Reset background and colors for print */
+  html,
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt !important;
+    line-height: 1.5 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Make the report area full width */
+  .ai-report-print-area {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  .ai-report-print-area * {
+    color: black !important;
+    border-color: #e5e7eb !important;
+  }
+
+  /* Override dark backgrounds for cards */
+  .ai-report-print-area .bg-zinc-900,
+  .ai-report-print-area .bg-zinc-800,
+  .ai-report-print-area [class*="bg-zinc"] {
+    background: white !important;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  /* Make text readable */
+  .ai-report-print-area .text-white,
+  .ai-report-print-area .text-zinc-300,
+  .ai-report-print-area .text-zinc-400 {
+    color: #1f2937 !important;
+  }
+
+  .ai-report-print-area .text-zinc-500 {
+    color: #6b7280 !important;
+  }
+
+  /* Preserve colored badges/pills */
+  .ai-report-print-area .text-green-400,
+  .ai-report-print-area .text-green-500 {
+    color: #16a34a !important;
+  }
+
+  .ai-report-print-area .text-yellow-400,
+  .ai-report-print-area .text-yellow-500 {
+    color: #ca8a04 !important;
+  }
+
+  .ai-report-print-area .text-blue-400,
+  .ai-report-print-area .text-blue-500 {
+    color: #2563eb !important;
+  }
+
+  .ai-report-print-area .text-red-400,
+  .ai-report-print-area .text-red-500 {
+    color: #dc2626 !important;
+  }
+
+  /* Page breaks */
+  .ai-report-print-area h2 {
+    page-break-after: avoid;
+  }
+
+  .ai-report-print-area .grid {
+    page-break-inside: avoid;
+  }
+
+  /* Hide interactive elements */
+  .ai-report-print-area button,
+  .ai-report-print-area [role="button"] {
+    display: none !important;
+  }
+
+  /* Ensure tables print well */
+  .ai-report-print-area table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .ai-report-print-area th,
+  .ai-report-print-area td {
+    border: 1px solid #e5e7eb;
+    padding: 8px;
+    text-align: left;
+  }
+
+  .ai-report-print-area thead {
+    background: #f9fafb !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 1.5cm;
+  }
+}
