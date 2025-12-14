@@ -92,106 +92,59 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("[v0] Saving report to database with service role client...")
-    const reportData = {
-      user_id: user.id,
-      config_id: config.id,
-      brand_name: brandName,
-      overall_score: result.brandScore,
-      previous_score: null,
-      score_change: null,
-      share_of_voice: {
-        brand: result.shareOfVoice,
-        competitors: result.competitorScores.reduce(
-          (acc, c) => {
-            acc[c.name] = c.shareOfVoice
-            return acc
-          },
-          {} as Record<string, number>,
-        ),
-      },
-      dimensional_scores: {
-        sentiment: result.sentiment,
-        modelBreakdown: result.modelBreakdown,
-      },
-      narrative_analysis: {
-        summary: result.summary,
-        strengths: result.strengths,
-        weaknesses: result.weaknesses,
-        opportunities: result.opportunities,
-        threats: result.threats,
-      },
-      strategy_plan: strategyPlan,
-      threats: result.competitorScores.map((c) => ({
-        competitor: c.name,
-        score: c.score,
-        shareOfVoice: c.shareOfVoice,
-        level: c.score > 70 ? "high" : c.score > 50 ? "medium" : "low",
-      })),
-      recommendations: result.opportunities.map((opp, i) => ({
-        id: i + 1,
-        title: opp,
-        priority: i === 0 ? "high" : "medium",
-      })),
-      models_queried: result.modelBreakdown.map((m) => m.model),
-      total_queries: result.queriesRun,
-      processing_time_ms: result.processingTime,
-      status: "completed",
-      created_at: result.timestamp,
+
+    // Build SWOT snapshot object
+    const swotSnapshot = {
+      strengths: result.strengths || [],
+      weaknesses: result.weaknesses || [],
+      opportunities: result.opportunities || [],
+      threats: result.threats || [],
     }
 
-    const { data: insertedReport, error: saveError } = await supabaseAdmin
+    // Build competitors block
+    const competitorBlock = result.competitorScores.map((c) => ({
+      name: c.name,
+      score: c.score,
+      shareOfVoice: c.shareOfVoice,
+      threatLevel: c.score > 70 ? "high" : c.score > 50 ? "medium" : "low",
+    }))
+
+    // Build 90/30/7 action plan
+    const actionPlan = strategyPlan?.plan90_30_7 || {
+      quickWins: result.opportunities.slice(0, 2),
+      thirtyDayGoals: result.opportunities.slice(2, 4),
+      ninetyDayVision: strategyPlan?.northStarGoal || "Improve AI brand visibility",
+    }
+
+    const { data: report, error: insertError } = await supabaseAdmin
       .from("reports")
-      .insert(reportData)
+      .insert({
+        profile_id: user.id,
+        brand_name: brandName,
+        summary: result.summary,
+        overall_score: result.brandScore,
+        swot: swotSnapshot,
+        competitors: competitorBlock,
+        actions_90_30_7: actionPlan,
+        models_queried: result.modelBreakdown.map((m) => m.model),
+        status: "completed",
+      })
       .select("id")
       .single()
 
-    let reportId: string | null = null
-
-    if (saveError) {
-      console.error("[v0] Save report FAILED:", saveError.message, saveError.details, saveError.code)
-      // Try minimal save with service role
-      const { data: minimalReport, error: minimalError } = await supabaseAdmin
-        .from("reports")
-        .insert({
-          user_id: user.id,
-          config_id: config.id,
-          brand_name: brandName,
-          overall_score: result.brandScore,
-          status: "completed",
-          created_at: result.timestamp,
-        })
-        .select("id")
-        .single()
-
-      if (minimalError) {
-        console.error("[v0] Minimal save ALSO FAILED:", minimalError.message, minimalError.code)
-        return NextResponse.json(
-          {
-            error: "Failed to save report to database",
-            message: minimalError.message,
-            code: minimalError.code,
-          },
-          { status: 500 },
-        )
-      } else {
-        console.log("[v0] Minimal save succeeded with ID:", minimalReport?.id)
-        reportId = minimalReport?.id
-      }
-    } else {
-      console.log("[v0] Report saved successfully with ID:", insertedReport?.id)
-      reportId = insertedReport?.id
+    if (insertError) {
+      console.error("[v0] Error inserting report:", insertError)
+      return NextResponse.json({ error: "Failed to save report", details: insertError.message }, { status: 500 })
     }
+
+    const reportId = report?.id
 
     if (!reportId) {
-      console.error("[v0] CRITICAL: No reportId after save operations")
-      return NextResponse.json(
-        {
-          error: "Failed to save report",
-          message: "Database insert succeeded but no ID was returned",
-        },
-        { status: 500 },
-      )
+      console.error("[v0] CRITICAL: No reportId after save")
+      return NextResponse.json({ error: "Failed to save report", message: "No ID returned" }, { status: 500 })
     }
+
+    console.log("[v0] Report saved successfully with ID:", reportId)
 
     // Update last run timestamp with service role
     await supabaseAdmin.from("tracking_configs").update({ last_run_at: new Date().toISOString() }).eq("id", config.id)
