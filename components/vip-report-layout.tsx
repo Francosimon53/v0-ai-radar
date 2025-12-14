@@ -147,44 +147,138 @@ ${
     <>
       <style jsx global>{`
         @media print {
-          body {
+          /* Reset everything for print */
+          html, body {
             background: white !important;
-            -webkit-print-color-adjust: exact;
-            color-adjust: exact;
+            color: black !important;
+            font-size: 12pt !important;
+            line-height: 1.5 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
-
-          /* Hide app chrome, nav, sidebars, buttons, etc. */
-          .app-shell-sidebar,
-          .app-shell-header,
-          .app-shell-footer,
-          .print-hidden,
-          button,
-          nav {
+          
+          /* Hide EVERYTHING by default */
+          body * {
+            visibility: hidden;
+          }
+          
+          /* Show only the report content and its children */
+          #report-print-root,
+          #report-print-root * {
+            visibility: visible !important;
+          }
+          
+          /* Position the report at top-left for printing */
+          #report-print-root {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 20px !important;
+            background: white !important;
+            color: black !important;
+          }
+          
+          /* Reset dark mode colors for print */
+          #report-print-root,
+          #report-print-root * {
+            color: black !important;
+            background-color: white !important;
+          }
+          
+          /* Override dark zinc backgrounds */
+          #report-print-root [class*="bg-zinc"],
+          #report-print-root [class*="bg-slate"] {
+            background-color: white !important;
+            border: 1px solid #d1d5db !important;
+          }
+          
+          /* Make muted text readable */
+          #report-print-root [class*="text-zinc"],
+          #report-print-root [class*="text-slate"],
+          #report-print-root [class*="text-gray"],
+          #report-print-root [class*="text-white"] {
+            color: #1f2937 !important;
+          }
+          
+          #report-print-root [class*="text-muted"] {
+            color: #6b7280 !important;
+          }
+          
+          /* Preserve semantic colors */
+          #report-print-root .text-green-400,
+          #report-print-root .text-green-500,
+          #report-print-root .text-emerald-400,
+          #report-print-root .text-emerald-500 {
+            color: #16a34a !important;
+          }
+          
+          #report-print-root .text-yellow-400,
+          #report-print-root .text-yellow-500,
+          #report-print-root .text-amber-400,
+          #report-print-root .text-amber-500 {
+            color: #ca8a04 !important;
+          }
+          
+          #report-print-root .text-blue-400,
+          #report-print-root .text-blue-500 {
+            color: #2563eb !important;
+          }
+          
+          #report-print-root .text-red-400,
+          #report-print-root .text-red-500 {
+            color: #dc2626 !important;
+          }
+          
+          /* Hide buttons and interactive elements */
+          #report-print-root button,
+          #report-print-root [role="button"],
+          #report-print-root .print\\:hidden,
+          .print\\:hidden {
             display: none !important;
+            visibility: hidden !important;
           }
-
-          /* Show only the report content */
-          .ai-report-print-area {
-            display: block !important;
-            padding: 24px;
-            max-width: 800px;
-            margin: 0 auto;
-          }
-
-          /* Avoid page breaks inside key sections */
-          .ai-report-print-area h1,
-          .ai-report-print-area h2,
-          .ai-report-print-area h3 {
+          
+          /* Page break rules */
+          #report-print-root h1,
+          #report-print-root h2,
+          #report-print-root h3 {
             page-break-after: avoid;
           }
-
-          .ai-report-print-area section {
+          
+          #report-print-root section,
+          #report-print-root .grid {
             page-break-inside: avoid;
+          }
+          
+          /* Table styling for print */
+          #report-print-root table {
+            border-collapse: collapse;
+            width: 100%;
+          }
+          
+          #report-print-root th,
+          #report-print-root td {
+            border: 1px solid #d1d5db !important;
+            padding: 8px !important;
+          }
+          
+          #report-print-root thead tr {
+            background-color: #f3f4f6 !important;
+          }
+          
+          @page {
+            size: A4;
+            margin: 1.5cm;
           }
         }
       `}</style>
-      <div className="ai-report-print-area">
-        <div className="px-6 py-8 space-y-8 max-w-6xl mx-auto">
+      <main id="report-print-root" className="report-print-root mx-auto max-w-5xl px-4 pb-16 pt-8">
+        <div className="space-y-8">
           {/* ─────────────────────────────────────────────────────────────────────
               Section 1: Header / Hero
           ───────────────────────────────────────────────────────────────────── */}
@@ -674,7 +768,7 @@ ${
             </Button>
           </div>
         </div>
-      </div>
+      </main>
     </>
   )
 }
