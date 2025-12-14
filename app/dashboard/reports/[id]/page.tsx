@@ -5,7 +5,8 @@ import ReportDetailClient from "./report-detail-client"
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
-export default async function ReportDetailPage({ params }: { params: { id: string } }) {
+export default async function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const supabase = await createServerClient()
 
   const {
@@ -20,7 +21,7 @@ export default async function ReportDetailPage({ params }: { params: { id: strin
   const { data: report, error } = await supabase
     .from("reports")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("user_id", user.id)
     .single()
 

@@ -1,8 +1,9 @@
 import { createServerClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const supabase = await createServerClient()
 
     const {
@@ -16,7 +17,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const { data: report, error } = await supabase
       .from("reports")
       .select("*")
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("user_id", user.id)
       .single()
 
