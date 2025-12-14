@@ -12,14 +12,11 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClient()
     const supabaseAdmin = createServiceClient()
-    console.log("[v0] Supabase clients created (user + service role)")
 
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
-
-    console.log("[v0] Auth check - user:", user?.id, "error:", authError?.message)
 
     if (authError || !user) {
       console.log("[v0] UNAUTHORIZED - no user")
@@ -31,9 +28,9 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Request body configId:", configId)
 
     let config = null
+    let actualConfigId = null
 
     if (configId && configId !== "current") {
-      console.log("[v0] Fetching config by ID:", configId)
       const { data, error } = await supabaseAdmin
         .from("tracking_configs")
         .select("*")
@@ -41,11 +38,11 @@ export async function POST(request: NextRequest) {
         .eq("user_id", user.id)
         .single()
       config = data
-      console.log("[v0] Config by ID result:", data ? "found" : "not found", error?.message)
+      actualConfigId = data?.id
+      console.log("[v0] Config by ID from tracking_configs:", data ? "found" : "not found", error?.message)
     }
 
     if (!config) {
-      console.log("[v0] Fetching any config for user")
       const { data, error } = await supabaseAdmin
         .from("tracking_configs")
         .select("*")
@@ -54,15 +51,65 @@ export async function POST(request: NextRequest) {
         .limit(1)
         .single()
       config = data
-      console.log("[v0] Any config result:", data ? "found" : "not found", error?.message)
+      actualConfigId = data?.id
+      console.log("[v0] Any config from tracking_configs:", data ? "found" : "not found", error?.message)
     }
 
     if (!config) {
-      console.log("[v0] NO CONFIG FOUND - returning 404")
-      return NextResponse.json({ error: "No tracking config found. Please complete setup first." }, { status: 404 })
+      const { data, error } = await supabaseAdmin
+        .from("brand_configs")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single()
+
+      if (data) {
+        config = {
+          id: data.id,
+          primary_brand: data.brand_name,
+          competitors: data.competitors || [],
+          industry: data.industry || "general",
+        }
+        actualConfigId = data.id
+        console.log("[v0] Found config from brand_configs:", data.brand_name)
+      } else {
+        console.log("[v0] No brand_configs found either:", error?.message)
+      }
     }
 
-    const brandName = config.primary_brand || config.name || "Unknown Brand"
+    if (!config || !actualConfigId) {
+      console.log("[v0] Creating default brand_config for user")
+      const { data: newConfig, error: createError } = await supabaseAdmin
+        .from("brand_configs")
+        .insert({
+          user_id: user.id,
+          brand_name: "My Brand",
+          industry: "general",
+          competitors: [],
+        })
+        .select("*")
+        .single()
+
+      if (createError || !newConfig) {
+        console.error("[v0] Failed to create brand_config:", createError)
+        return NextResponse.json(
+          { error: "Failed to create brand configuration", details: createError?.message },
+          { status: 500 },
+        )
+      }
+
+      config = {
+        id: newConfig.id,
+        primary_brand: newConfig.brand_name,
+        competitors: newConfig.competitors || [],
+        industry: newConfig.industry || "general",
+      }
+      actualConfigId = newConfig.id
+      console.log("[v0] Created brand_config with ID:", actualConfigId)
+    }
+
+    const brandName = config.primary_brand || config.brand_name || config.name || "Unknown Brand"
     const competitors = config.competitors || []
     const industry = config.industry || "general"
 
@@ -71,12 +118,10 @@ export async function POST(request: NextRequest) {
     )
 
     // Run the simplified analysis
-    console.log("[v0] Calling runSimpleAnalysis...")
     const result = await runSimpleAnalysis(brandName, competitors, industry)
-    console.log("[v0] Analysis complete - brandScore:", result.brandScore, "queriesSucceeded:", result.queriesSucceeded)
+    console.log("[v0] Analysis complete - brandScore:", result.brandScore)
 
     // Build strategy plan
-    console.log("[v0] Building strategy plan...")
     let strategyPlan = null
     try {
       const trackingConfig = {
@@ -86,70 +131,97 @@ export async function POST(request: NextRequest) {
         userId: user.id,
       }
       strategyPlan = await buildStrategyPlan(result, trackingConfig, undefined)
-      console.log("[v0] Strategy plan built - northStarGoal:", strategyPlan?.northStarGoal?.substring(0, 50))
     } catch (strategyError) {
       console.error("[v0] Strategy plan FAILED:", strategyError)
     }
 
-    console.log("[v0] Saving report to database with service role client...")
+    const shareOfVoiceData = {
+      brand: result.shareOfVoice,
+      competitors: result.competitorScores.map((c) => ({
+        name: c.name,
+        shareOfVoice: c.shareOfVoice,
+      })),
+    }
 
-    // Build SWOT snapshot object
-    const swotSnapshot = {
+    const dimensionalScores = {
+      visibility: result.brandScore,
+      sentiment: result.sentiment === "positive" ? 80 : result.sentiment === "negative" ? 30 : 55,
+      authority: Math.round(result.brandScore * 0.9),
+      relevance: Math.round(result.brandScore * 1.05),
+    }
+
+    const narrativeAnalysis = {
+      summary: result.summary,
       strengths: result.strengths || [],
       weaknesses: result.weaknesses || [],
       opportunities: result.opportunities || [],
       threats: result.threats || [],
+      swot: {
+        strengths: result.strengths || [],
+        weaknesses: result.weaknesses || [],
+        opportunities: result.opportunities || [],
+        threats: result.threats || [],
+      },
+      competitorScores: result.competitorScores,
+      actions_90_30_7: strategyPlan?.plan90_30_7 || {
+        quickWins: result.opportunities.slice(0, 2),
+        thirtyDayGoals: result.opportunities.slice(2, 4),
+        ninetyDayVision: strategyPlan?.northStarGoal || "Improve AI brand visibility",
+      },
     }
 
-    // Build competitors block
-    const competitorBlock = result.competitorScores.map((c) => ({
-      name: c.name,
-      score: c.score,
-      shareOfVoice: c.shareOfVoice,
-      threatLevel: c.score > 70 ? "high" : c.score > 50 ? "medium" : "low",
+    const threatsData = (result.threats || []).map((threat, i) => ({
+      id: i + 1,
+      description: threat,
+      severity: i === 0 ? "high" : "medium",
     }))
 
-    // Build 90/30/7 action plan
-    const actionPlan = strategyPlan?.plan90_30_7 || {
-      quickWins: result.opportunities.slice(0, 2),
-      thirtyDayGoals: result.opportunities.slice(2, 4),
-      ninetyDayVision: strategyPlan?.northStarGoal || "Improve AI brand visibility",
-    }
+    const recommendationsData = (strategyPlan?.plan90_30_7?.quickWins || result.opportunities || []).map((rec, i) => ({
+      id: i + 1,
+      action: rec,
+      priority: i < 2 ? "high" : "medium",
+      timeframe: i < 2 ? "7 days" : "30 days",
+    }))
+
+    console.log("[v0] Inserting report with config_id:", actualConfigId)
 
     const { data: report, error: insertError } = await supabaseAdmin
       .from("reports")
       .insert({
-        profile_id: user.id,
+        config_id: actualConfigId,
+        user_id: user.id,
         brand_name: brandName,
-        summary: result.summary,
         overall_score: result.brandScore,
-        swot: swotSnapshot,
-        competitors: competitorBlock,
-        actions_90_30_7: actionPlan,
+        share_of_voice: shareOfVoiceData,
+        dimensional_scores: dimensionalScores,
+        narrative_analysis: narrativeAnalysis,
+        threats: threatsData,
+        recommendations: recommendationsData,
         models_queried: result.modelBreakdown.map((m) => m.model),
+        total_queries: result.queriesSucceeded,
+        processing_time_ms: Date.now() - startTime,
         status: "completed",
+        completed_at: new Date().toISOString(),
       })
       .select("*")
       .single()
 
     if (insertError) {
-      console.error("[v0] Error inserting report:", insertError)
+      console.error("[v0] Error inserting report:", insertError.message, insertError.details, insertError.hint)
       return NextResponse.json({ error: "Failed to save report", details: insertError.message }, { status: 500 })
     }
 
-    const reportId = report?.id
-
-    if (!reportId) {
+    if (!report?.id) {
       console.error("[v0] CRITICAL: No reportId after save")
       return NextResponse.json({ error: "Failed to save report", message: "No ID returned" }, { status: 500 })
     }
 
-    console.log("[v0] Report saved successfully with ID:", reportId)
+    console.log("[v0] Report saved successfully with ID:", report.id)
 
-    // Update last run timestamp with service role
-    await supabaseAdmin.from("tracking_configs").update({ last_run_at: new Date().toISOString() }).eq("id", config.id)
+    // Update last run timestamp
+    await supabaseAdmin.from("brand_configs").update({ updated_at: new Date().toISOString() }).eq("id", actualConfigId)
 
-    const response = {
+    return NextResponse.json({
       success: true,
       reportId: report.id,
       report,
@@ -158,18 +230,7 @@ export async function POST(request: NextRequest) {
       sentiment: result.sentiment,
       summary: result.summary,
       processingTime: Date.now() - startTime,
-      result,
-      planSummary: strategyPlan
-        ? {
-            northStarGoal: strategyPlan.northStarGoal,
-            quickWins: strategyPlan.plan90_30_7?.quickWins || [],
-            backlogCount: strategyPlan.backlog?.length || 0,
-          }
-        : null,
-    }
-
-    console.log("[v0] SUCCESS - returning reportId:", reportId, "brandScore:", response.brandScore)
-    return NextResponse.json(response)
+    })
   } catch (error) {
     console.error("[v0] FATAL ERROR:", error)
     return NextResponse.json(
