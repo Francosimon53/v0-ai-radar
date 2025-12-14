@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { createServerClient, createServiceClient } from "@/lib/supabase/server"
 import { runSimpleAnalysis } from "@/lib/analysis/simple-engine"
 import { buildStrategyPlan } from "@/lib/analysis/strategy-plan"
 
@@ -11,7 +11,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = await createServerClient()
-    console.log("[v0] Supabase client created")
+    const supabaseAdmin = createServiceClient()
+    console.log("[v0] Supabase clients created (user + service role)")
 
     const {
       data: { user },
@@ -29,12 +30,11 @@ export async function POST(request: NextRequest) {
     const { configId } = body
     console.log("[v0] Request body configId:", configId)
 
-    // Fetch tracking config
     let config = null
 
     if (configId && configId !== "current") {
       console.log("[v0] Fetching config by ID:", configId)
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from("tracking_configs")
         .select("*")
         .eq("id", configId)
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     if (!config) {
       console.log("[v0] Fetching any config for user")
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from("tracking_configs")
         .select("*")
         .eq("user_id", user.id)
@@ -91,8 +91,7 @@ export async function POST(request: NextRequest) {
       console.error("[v0] Strategy plan FAILED:", strategyError)
     }
 
-    // Save to database
-    console.log("[v0] Saving report to database...")
+    console.log("[v0] Saving report to database with service role client...")
     const reportData = {
       user_id: user.id,
       config_id: config.id,
@@ -140,7 +139,7 @@ export async function POST(request: NextRequest) {
       created_at: result.timestamp,
     }
 
-    const { data: insertedReport, error: saveError } = await supabase
+    const { data: insertedReport, error: saveError } = await supabaseAdmin
       .from("reports")
       .insert(reportData)
       .select("id")
@@ -149,9 +148,9 @@ export async function POST(request: NextRequest) {
     let reportId: string | null = null
 
     if (saveError) {
-      console.error("[v0] Save report FAILED:", saveError.message, saveError.details)
-      // Try minimal save
-      const { data: minimalReport, error: minimalError } = await supabase
+      console.error("[v0] Save report FAILED:", saveError.message, saveError.details, saveError.code)
+      // Try minimal save with service role
+      const { data: minimalReport, error: minimalError } = await supabaseAdmin
         .from("reports")
         .insert({
           user_id: user.id,
@@ -165,7 +164,15 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (minimalError) {
-        console.error("[v0] Minimal save ALSO FAILED:", minimalError.message)
+        console.error("[v0] Minimal save ALSO FAILED:", minimalError.message, minimalError.code)
+        return NextResponse.json(
+          {
+            error: "Failed to save report to database",
+            message: minimalError.message,
+            code: minimalError.code,
+          },
+          { status: 500 },
+        )
       } else {
         console.log("[v0] Minimal save succeeded with ID:", minimalReport?.id)
         reportId = minimalReport?.id
@@ -175,12 +182,24 @@ export async function POST(request: NextRequest) {
       reportId = insertedReport?.id
     }
 
-    // Update last run timestamp
-    await supabase.from("tracking_configs").update({ last_run_at: new Date().toISOString() }).eq("id", config.id)
+    if (!reportId) {
+      console.error("[v0] CRITICAL: No reportId after save operations")
+      return NextResponse.json(
+        {
+          error: "Failed to save report",
+          message: "Database insert succeeded but no ID was returned",
+        },
+        { status: 500 },
+      )
+    }
+
+    // Update last run timestamp with service role
+    await supabaseAdmin.from("tracking_configs").update({ last_run_at: new Date().toISOString() }).eq("id", config.id)
 
     const response = {
       success: true,
       analysisId: reportId,
+      reportId: reportId,
       brandScore: result.brandScore,
       shareOfVoice: result.shareOfVoice,
       sentiment: result.sentiment,
@@ -196,7 +215,7 @@ export async function POST(request: NextRequest) {
         : null,
     }
 
-    console.log("[v0] Returning success response - reportId:", reportId, "brandScore:", response.brandScore)
+    console.log("[v0] SUCCESS - returning reportId:", reportId, "brandScore:", response.brandScore)
     return NextResponse.json(response)
   } catch (error) {
     console.error("[v0] FATAL ERROR:", error)
