@@ -25,26 +25,26 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { configId } = body
-    console.log("[v0] Request body configId:", configId)
+    console.log("[v0] Request body configId:", configId, "user.id:", user.id)
 
     let config = null
     let actualConfigId = null
 
     if (configId && configId !== "current") {
       const { data, error } = await supabaseAdmin
-        .from("tracking_configs")
+        .from("brand_configs")
         .select("*")
         .eq("id", configId)
         .eq("user_id", user.id)
         .single()
       config = data
       actualConfigId = data?.id
-      console.log("[v0] Config by ID from tracking_configs:", data ? "found" : "not found", error?.message)
+      console.log("[v0] Config by ID from brand_configs:", data ? "found" : "not found", error?.message)
     }
 
     if (!config) {
       const { data, error } = await supabaseAdmin
-        .from("tracking_configs")
+        .from("brand_configs")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
@@ -52,44 +52,41 @@ export async function POST(request: NextRequest) {
         .single()
       config = data
       actualConfigId = data?.id
-      console.log("[v0] Any config from tracking_configs:", data ? "found" : "not found", error?.message)
+      console.log("[v0] Any config from brand_configs:", data ? "found" : "not found", error?.message)
     }
 
     if (!config || !actualConfigId) {
-      console.log("[v0] Creating default tracking_config for user")
+      console.log("[v0] Creating default brand_config for user")
       const { data: newConfig, error: createError } = await supabaseAdmin
-        .from("tracking_configs")
+        .from("brand_configs")
         .insert({
           user_id: user.id,
-          primary_brand: "My Brand",
+          brand_name: "My Brand",
           industry: "general",
           competitors: [],
-          ai_assistants: ["chatgpt", "claude"],
-          regions: ["north-america"],
-          languages: ["en"],
         })
         .select("*")
         .single()
 
       if (createError || !newConfig) {
         console.error(
-          "[v0] Failed to create tracking_config:",
+          "[v0] Failed to create brand_config:",
           createError?.message,
           createError?.details,
           createError?.hint,
         )
         return NextResponse.json(
-          { error: "Failed to create tracking configuration", details: createError?.message },
+          { error: "Failed to create brand configuration", details: createError?.message },
           { status: 500 },
         )
       }
 
       config = newConfig
       actualConfigId = newConfig.id
-      console.log("[v0] Created tracking_config with ID:", actualConfigId)
+      console.log("[v0] Created brand_config with ID:", actualConfigId)
     }
 
-    const brandName = config.primary_brand || config.brand_name || config.name || "Unknown Brand"
+    const brandName = config.brand_name || config.primary_brand || config.name || "Unknown Brand"
     const competitors = config.competitors || []
     const industry = config.industry || "general"
 
@@ -163,7 +160,7 @@ export async function POST(request: NextRequest) {
       timeframe: i < 2 ? "7 days" : "30 days",
     }))
 
-    console.log("[v0] Inserting report with config_id:", actualConfigId)
+    console.log("[v0] Inserting report with config_id:", actualConfigId, "user_id:", user.id)
 
     const { data: report, error: insertError } = await supabaseAdmin
       .from("reports")
@@ -198,11 +195,8 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Report saved successfully with ID:", report.id)
 
-    // Update last run timestamp
-    await supabaseAdmin
-      .from("tracking_configs")
-      .update({ updated_at: new Date().toISOString() })
-      .eq("id", actualConfigId)
+    // Update last run timestamp on brand_config
+    await supabaseAdmin.from("brand_configs").update({ updated_at: new Date().toISOString() }).eq("id", actualConfigId)
 
     return NextResponse.json({
       success: true,
