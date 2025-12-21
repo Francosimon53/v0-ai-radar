@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { Bell, LayoutDashboard, Settings, Users, FileText } from "lucide-react"
+import { Bell, LayoutDashboard, Settings, Users, FileText, MessageSquare } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,7 @@ export default function DashboardLayoutClient({
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "AI Chat", href: "/chat", icon: MessageSquare },
     { name: "Competitors", href: "/dashboard/competitors", icon: Users },
     { name: "Reports", href: "/dashboard/reports", icon: FileText },
     { name: "Alerts", href: "/dashboard/alerts", icon: Bell },
