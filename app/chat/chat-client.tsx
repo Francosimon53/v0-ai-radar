@@ -3,8 +3,6 @@
 import type React from "react"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport } from "ai"
 import { useRouter } from "next/navigation"
 import {
   MessageSquare,
@@ -29,6 +27,12 @@ interface Conversation {
   updated_at: string
 }
 
+interface Message {
+  id: string
+  role: "user" | "assistant"
+  content: string
+}
+
 interface ChatClientProps {
   initialConversations: Conversation[]
   userPlan: string
@@ -36,7 +40,12 @@ interface ChatClientProps {
   queriesLimit: number
 }
 
-export function ChatClient({ initialConversations, userPlan, queriesUsed, queriesLimit }: ChatClientProps) {
+export function ChatClient({
+  initialConversations,
+  userPlan,
+  queriesUsed: initialQueriesUsed,
+  queriesLimit,
+}: ChatClientProps) {
   const router = useRouter()
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations)
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
@@ -45,12 +54,9 @@ export function ChatClient({ initialConversations, userPlan, queriesUsed, querie
   const [isCreatingConversation, setIsCreatingConversation] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const { messages, sendMessage, setMessages, status } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      body: { conversationId: activeConversationId },
-    }),
-  })
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [queriesUsed, setQueriesUsed] = useState(initialQueriesUsed)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -67,17 +73,17 @@ export function ChatClient({ initialConversations, userPlan, queriesUsed, querie
     } else {
       setMessages([])
     }
-  }, [activeConversationId, setMessages])
+  }, [activeConversationId])
 
   const loadConversationMessages = async (conversationId: string) => {
     try {
       const response = await fetch(`/api/conversations/${conversationId}`)
       if (response.ok) {
         const { messages: dbMessages } = await response.json()
-        const formattedMessages = dbMessages.map((msg: any) => ({
+        const formattedMessages: Message[] = dbMessages.map((msg: any) => ({
           id: msg.id,
           role: msg.role,
-          parts: [{ type: "text", text: msg.content }],
+          content: msg.content,
         }))
         setMessages(formattedMessages)
       }
@@ -120,10 +126,24 @@ export function ChatClient({ initialConversations, userPlan, queriesUsed, querie
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || status !== "ready") return
+    if (!input.trim() || isLoading) return
+
+    const userMessage = input.trim()
+    setInput("")
+
+    // Add user message to UI immediately
+    const userMessageObj: Message = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: userMessage,
+    }
+    setMessages((prev) => [...prev, userMessageObj])
+    setIsLoading(true)
+
+    let conversationId = activeConversationId
 
     // Create conversation if none exists
-    if (!activeConversationId) {
+    if (!conversationId) {
       setIsCreatingConversation(true)
       try {
         const response = await fetch("/api/conversations", { method: "POST" })
@@ -131,22 +151,71 @@ export function ChatClient({ initialConversations, userPlan, queriesUsed, querie
           const { conversation } = await response.json()
           setConversations([conversation, ...conversations])
           setActiveConversationId(conversation.id)
-          // Send message after conversation is created
-          setTimeout(() => {
-            sendMessage({ text: input })
-            setInput("")
-          }, 100)
+          conversationId = conversation.id
+        } else {
+          throw new Error("Failed to create conversation")
         }
       } catch (error) {
         console.error("Failed to create conversation:", error)
+        setIsLoading(false)
+        setIsCreatingConversation(false)
+        return
       } finally {
         setIsCreatingConversation(false)
       }
-      return
     }
 
-    sendMessage({ text: input })
-    setInput("")
+    // Send message to API
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userMessage,
+          conversationId,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        // Handle error response
+        const errorMessage: Message = {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: data.error || "Sorry, something went wrong. Please try again.",
+        }
+        setMessages((prev) => [...prev, errorMessage])
+      } else {
+        // Add assistant response to messages
+        const assistantMessage: Message = {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: data.response,
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+
+        // Update queries used counter
+        if (typeof data.used === "number") {
+          setQueriesUsed(data.used)
+        }
+
+        // Update conversation ID if returned
+        if (data.conversationId && !activeConversationId) {
+          setActiveConversationId(data.conversationId)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to send message:", error)
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        role: "assistant",
+        content: "Failed to connect to the server. Please check your connection and try again.",
+      }
+      setMessages((prev) => [...prev, errorMessage])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleExportPDF = useCallback(() => {
@@ -163,8 +232,6 @@ export function ChatClient({ initialConversations, userPlan, queriesUsed, querie
       alert("Failed to copy link")
     }
   }, [activeConversationId])
-
-  const isLoading = status === "streaming" || status === "submitted"
 
   return (
     <div className="flex h-screen bg-zinc-950 text-slate-100">
@@ -203,7 +270,7 @@ export function ChatClient({ initialConversations, userPlan, queriesUsed, querie
             </Button>
           </div>
 
-          {/* Query Usage Badge */}
+          {/* Query Usage Badge - now uses local state */}
           <div className="px-3 pb-3">
             <div className="bg-zinc-800/50 rounded-lg px-3 py-2 text-sm">
               <div className="flex items-center justify-between text-slate-400">
@@ -358,16 +425,7 @@ export function ChatClient({ initialConversations, userPlan, queriesUsed, querie
                       message.role === "user" ? "bg-amber-500 text-zinc-900" : "bg-zinc-800 text-slate-100",
                     )}
                   >
-                    {message.parts?.map((part, index) => {
-                      if (part.type === "text") {
-                        return (
-                          <div key={index} className="whitespace-pre-wrap text-sm leading-relaxed">
-                            {part.text}
-                          </div>
-                        )
-                      }
-                      return null
-                    })}
+                    <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
                   </div>
                   {message.role === "user" && (
                     <div className="w-8 h-8 rounded-lg bg-zinc-700 flex items-center justify-center flex-shrink-0">
