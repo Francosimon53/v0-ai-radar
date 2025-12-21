@@ -27,6 +27,32 @@ export async function POST(request: NextRequest) {
     const { configId } = body
     console.log("[v0] Request body configId:", configId, "user.id:", user.id)
 
+    const { data: existingProfile } = await supabaseAdmin.from("profiles").select("id").eq("id", user.id).single()
+
+    if (!existingProfile) {
+      console.log("[v0] Profile not found, creating one for user:", user.id)
+      const { error: profileError } = await supabaseAdmin.from("profiles").insert({
+        id: user.id,
+        email: user.email || "",
+        full_name: user.user_metadata?.full_name || "",
+      })
+
+      if (profileError) {
+        console.error("[v0] Failed to create profile:", profileError.message, profileError.code, profileError.hint)
+        return NextResponse.json(
+          {
+            error: "Failed to create user profile",
+            details: profileError.message,
+            code: profileError.code,
+          },
+          { status: 500 },
+        )
+      }
+      console.log("[v0] Profile created successfully")
+    } else {
+      console.log("[v0] Profile already exists")
+    }
+
     let config = null
     let actualConfigId = null
 
@@ -58,15 +84,14 @@ export async function POST(request: NextRequest) {
     if (!config || !actualConfigId) {
       console.log("[v0] Creating default brand_config for user:", user.id)
 
-      // The admin client bypasses RLS but FK constraints still apply
-      // Using the user's client ensures proper auth context
-      const { data: newConfig, error: createError } = await supabase
+      const { data: newConfig, error: createError } = await supabaseAdmin
         .from("brand_configs")
         .insert({
           user_id: user.id,
           brand_name: "My Brand",
           industry: "general",
           competitors: [],
+          is_active: true,
         })
         .select("*")
         .single()
@@ -75,34 +100,24 @@ export async function POST(request: NextRequest) {
         console.error("[v0] Failed to create brand_config:")
         console.error("[v0] Error message:", createError?.message)
         console.error("[v0] Error code:", createError?.code)
-        console.error("[v0] Error details:", JSON.stringify(createError, null, 2))
+        console.error("[v0] Error details:", createError?.details)
+        console.error("[v0] Error hint:", createError?.hint)
 
-        const { data: retryConfig, error: retryError } = await supabase
-          .from("brand_configs")
-          .insert({
-            brand_name: "My Brand",
-            industry: "general",
-            competitors: [],
-          })
-          .select("*")
-          .single()
-
-        if (retryError || !retryConfig) {
-          console.error("[v0] Retry also failed:", retryError?.message)
-          return NextResponse.json(
-            { error: "Failed to create brand configuration", details: createError?.message },
-            { status: 500 },
-          )
-        }
-
-        config = retryConfig
-        actualConfigId = retryConfig.id
-        console.log("[v0] Retry succeeded with ID:", actualConfigId)
-      } else {
-        config = newConfig
-        actualConfigId = newConfig.id
-        console.log("[v0] Created brand_config with ID:", actualConfigId)
+        return NextResponse.json(
+          {
+            error: "Failed to create brand configuration",
+            details: createError?.message,
+            code: createError?.code,
+            hint: createError?.hint,
+            userId: user.id,
+          },
+          { status: 500 },
+        )
       }
+
+      config = newConfig
+      actualConfigId = newConfig.id
+      console.log("[v0] Created brand_config with ID:", actualConfigId)
     }
 
     const brandName = config.brand_name || config.primary_brand || config.name || "Unknown Brand"
