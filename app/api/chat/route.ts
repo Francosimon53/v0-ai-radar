@@ -55,7 +55,10 @@ function extractBrandFromMessage(message: string): string | null {
   for (const pattern of patterns) {
     const match = message.match(pattern)
     if (match && match[1]) {
-      return match[1].trim()
+      const brand = match[1].trim()
+      if (brand.length >= 2) {
+        return brand
+      }
     }
   }
 
@@ -64,6 +67,8 @@ function extractBrandFromMessage(message: string): string | null {
 
 async function callRailwayAnalysis(brandName: string, competitors: string[] = []) {
   try {
+    console.log("[v0] Calling Railway API for brand:", brandName)
+
     const response = await fetch(`${RAILWAY_API_URL}/analyze`, {
       method: "POST",
       headers: {
@@ -76,11 +81,16 @@ async function callRailwayAnalysis(brandName: string, competitors: string[] = []
       }),
     })
 
+    console.log("[v0] Railway API response status:", response.status)
+
     if (!response.ok) {
+      const errorText = await response.text()
+      console.error("[v0] Railway API error response:", errorText)
       throw new Error(`Railway API error: ${response.status} ${response.statusText}`)
     }
 
     const result = await response.json()
+    console.log("[v0] Railway API result:", JSON.stringify(result).slice(0, 200))
 
     if (result.success) {
       return result.data
@@ -209,23 +219,42 @@ export async function POST(req: Request) {
         const analysisData = await callRailwayAnalysis(brandName)
         responseText = formatAnalysisResponse(analysisData, brandName)
       } catch (error) {
-        responseText = `I encountered an error analyzing "${brandName}". The analysis service may be temporarily unavailable. Please try again in a moment.\n\nError: ${error instanceof Error ? error.message : "Unknown error"}`
+        const errorMessage = error instanceof Error ? error.message : "Unknown error"
+        responseText = `## Unable to Analyze "${brandName}"
+
+I encountered an issue while trying to analyze this brand. This could happen because:
+
+1. **The analysis service is temporarily unavailable** - Please try again in a few moments
+2. **The brand name might need to be more specific** - Try using the full company name (e.g., "Nike Inc" instead of just "Nike")
+3. **Network connectivity issues** - The service might be experiencing high load
+
+**What you can try:**
+- Wait a moment and try again
+- Use a more specific brand name
+- Try a different brand to test connectivity
+
+*Technical details: ${errorMessage}*`
       }
     } else {
       // No brand detected - provide helpful response
-      responseText = `I'm your AI Brand Analyst. I can help you analyze how any brand is perceived by AI systems like ChatGPT, Claude, Gemini, and Perplexity.
+      responseText = `## Welcome to AI Brand Analysis
+
+I'm your AI Brand Analyst. I can help you analyze how any brand is perceived by AI systems like ChatGPT, Claude, Gemini, and Perplexity.
 
 **To get started, try asking:**
 - "Analyze Nike's brand perception"
 - "How is Apple perceived by AI?"
 - "Run an analysis for Tesla"
 - "What's the AI visibility of Microsoft?"
+- "Analizar la marca Coca-Cola"
 
 Just mention a brand name and I'll provide a comprehensive analysis including:
-- AI visibility scores across platforms
-- Sentiment analysis
-- SWOT analysis
-- Actionable recommendations`
+- **AI visibility scores** across platforms
+- **Sentiment analysis** 
+- **SWOT analysis**
+- **Actionable recommendations**
+
+*Tip: Make sure to include a recognizable brand name in your question (at least 2 characters).*`
     }
 
     // Save messages to database
