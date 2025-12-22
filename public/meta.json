@@ -1,0 +1,10 @@
+{
+  "app": "AI Viber Radar",
+  "version": "1.0.0",
+  "environment": "production",
+  "features": {
+    "brandAnalysis": true,
+    "competitorComparison": true,
+    "pdfExport": true
+  }
+}
