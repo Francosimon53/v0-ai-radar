@@ -171,6 +171,7 @@ export function ChatClient({
     }
 
     try {
+      console.log("[v0] Sending message to /api/chat:", userMessage)
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -180,33 +181,32 @@ export function ChatClient({
         }),
       })
 
+      console.log("[v0] API response status:", response.status)
       const data = await response.json()
+      console.log("[v0] API response data:", data)
 
-      if (!response.ok) {
-        const errorMessage: Message = {
-          id: `error-${Date.now()}`,
-          role: "assistant",
-          content: data.error || "Sorry, something went wrong. Please try again.",
-        }
-        setMessages((prev) => [...prev, errorMessage])
-      } else {
-        const assistantMessage: Message = {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: data.response,
-        }
-        setMessages((prev) => [...prev, assistantMessage])
+      const assistantContent = !response.ok
+        ? data.error || "Sorry, something went wrong. Please try again."
+        : data.response || "Analyzing brand perception..."
 
-        if (typeof data.used === "number") {
-          setQueriesUsed(data.used)
-        }
+      const assistantMessage: Message = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: assistantContent,
+      }
 
-        if (data.conversationId && !activeConversationId) {
-          setActiveConversationId(data.conversationId)
-        }
+      console.log("[v0] Adding assistant message:", assistantContent.slice(0, 100))
+      setMessages((prev) => [...prev, assistantMessage])
+
+      if (typeof data.used === "number") {
+        setQueriesUsed(data.used)
+      }
+
+      if (data.conversationId && !activeConversationId) {
+        setActiveConversationId(data.conversationId)
       }
     } catch (error) {
-      console.error("Failed to send message:", error)
+      console.error("[v0] Failed to send message:", error)
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
         role: "assistant",
