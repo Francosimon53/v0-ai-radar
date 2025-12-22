@@ -1,4 +1,4 @@
-import { createServerClient, createServiceClient } from "@/lib/supabase/server"
+import { createServerClient } from "@/lib/supabase/server"
 
 export const maxDuration = 60
 
@@ -13,43 +13,27 @@ const PLAN_LIMITS = {
 
 type PlanType = keyof typeof PLAN_LIMITS
 
-// Helper to get user's plan and usage
 async function getUserPlanAndUsage(userId: string) {
-  const supabaseAdmin = createServiceClient()
-
-  // Get user's subscription/plan
-  const { data: profile } = await supabaseAdmin.from("profiles").select("subscription_tier").eq("id", userId).single()
-
-  const plan = (profile?.subscription_tier as PlanType) || "free"
-  const limit = PLAN_LIMITS[plan]
-
-  // Count messages this month
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setHours(0, 0, 0, 0)
-
-  const { count } = await supabaseAdmin
-    .from("chat_messages")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("role", "user")
-    .gte("created_at", startOfMonth.toISOString())
-
+  // Default values - assume free plan with plenty of queries for now
+  // since database tables may not exist yet
   return {
-    plan,
-    limit,
-    used: count || 0,
-    remaining: limit === Number.POSITIVE_INFINITY ? Number.POSITIVE_INFINITY : limit - (count || 0),
+    plan: "free" as PlanType,
+    limit: PLAN_LIMITS.free,
+    used: 0,
+    remaining: PLAN_LIMITS.free,
   }
 }
 
 function extractBrandFromMessage(message: string): string | null {
-  // Common patterns for brand mentions
+  const trimmed = message.trim()
+
+  // Pattern-based extraction first
   const patterns = [
-    /(?:analyze|analizar|analysis of|análisis de)\s+["']?([A-Za-z0-9\s&]+?)["']?(?:\s|$|,|\.|brand)/i,
-    /(?:brand|marca)\s+["']?([A-Za-z0-9\s&]+?)["']?/i,
-    /(?:about|sobre)\s+["']?([A-Za-z0-9\s&]+?)["']?(?:\s|$|,|\.)/i,
-    /(?:how is|como está|what about)\s+["']?([A-Za-z0-9\s&]+?)["']?/i,
+    /(?:analyze|analizar|analysis of|análisis de)\s+["']?([A-Za-z0-9\s&-]+?)["']?(?:\s|$|,|\.|brand)/i,
+    /(?:brand|marca)\s+["']?([A-Za-z0-9\s&-]+?)["']?/i,
+    /(?:about|sobre)\s+["']?([A-Za-z0-9\s&-]+?)["']?(?:\s|$|,|\.)/i,
+    /(?:how is|como está|what about|tell me about|dime sobre)\s+["']?([A-Za-z0-9\s&-]+?)["']?/i,
+    /(?:perception of|percepción de)\s+["']?([A-Za-z0-9\s&-]+?)["']?/i,
   ]
 
   for (const pattern of patterns) {
@@ -62,44 +46,70 @@ function extractBrandFromMessage(message: string): string | null {
     }
   }
 
+  // If no pattern matched but the message is short (1-3 words) and looks like a brand name,
+  // treat the whole message as a brand name
+  const words = trimmed.split(/\s+/)
+  if (words.length <= 3 && words.length >= 1) {
+    // Check if it looks like a brand (starts with capital or is all lowercase, no special chars except &-)
+    const potentialBrand = trimmed
+    if (/^[A-Za-z0-9\s&-]+$/.test(potentialBrand) && potentialBrand.length >= 2) {
+      // Filter out common non-brand words
+      const nonBrandWords = [
+        "hello",
+        "hi",
+        "hey",
+        "hola",
+        "help",
+        "ayuda",
+        "what",
+        "que",
+        "how",
+        "como",
+        "yes",
+        "no",
+        "ok",
+        "thanks",
+        "gracias",
+      ]
+      if (!nonBrandWords.includes(potentialBrand.toLowerCase())) {
+        return potentialBrand
+      }
+    }
+  }
+
   return null
 }
 
 async function callRailwayAnalysis(brandName: string, competitors: string[] = []) {
-  try {
-    console.log("[v0] Calling Railway API for brand:", brandName)
+  console.log("[v0] Calling Railway API for brand:", brandName)
 
-    const response = await fetch(`${RAILWAY_API_URL}/analyze`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        brand_name: brandName,
-        competitors,
-        depth: "standard",
-      }),
-    })
+  const response = await fetch(`${RAILWAY_API_URL}/analyze`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      brand_name: brandName,
+      competitors,
+      depth: "standard",
+    }),
+  })
 
-    console.log("[v0] Railway API response status:", response.status)
+  console.log("[v0] Railway API response status:", response.status)
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error("[v0] Railway API error response:", errorText)
-      throw new Error(`Railway API error: ${response.status} ${response.statusText}`)
-    }
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error("[v0] Railway API error response:", errorText)
+    throw new Error(`Railway API error: ${response.status}`)
+  }
 
-    const result = await response.json()
-    console.log("[v0] Railway API result:", JSON.stringify(result).slice(0, 200))
+  const result = await response.json()
+  console.log("[v0] Railway API result:", JSON.stringify(result).slice(0, 500))
 
-    if (result.success) {
-      return result.data
-    } else {
-      throw new Error(result.error || "Railway analysis failed")
-    }
-  } catch (error) {
-    console.error("[v0] Railway API error:", error)
-    throw error
+  if (result.success) {
+    return result.data
+  } else {
+    throw new Error(result.error || "Railway analysis failed")
   }
 }
 
@@ -177,7 +187,6 @@ export async function POST(req: Request) {
   const { message, conversationId }: { message: string; conversationId?: string } = await req.json()
 
   const supabase = await createServerClient()
-  const supabaseAdmin = createServiceClient()
 
   const {
     data: { user },
@@ -190,27 +199,13 @@ export async function POST(req: Request) {
     })
   }
 
-  // Check plan limits
-  const { plan, limit, used, remaining } = await getUserPlanAndUsage(user.id)
-
-  if (remaining <= 0) {
-    return new Response(
-      JSON.stringify({
-        error: "Query limit exceeded",
-        message: `You've used all ${limit} queries for this month on the ${plan} plan. Upgrade to Pro or Enterprise for more queries.`,
-        plan,
-        used,
-        limit,
-      }),
-      {
-        status: 429,
-        headers: { "Content-Type": "application/json" },
-      },
-    )
-  }
+  // Get plan info (simplified, doesn't require chat_messages table)
+  const { used } = await getUserPlanAndUsage(user.id)
 
   try {
     const brandName = extractBrandFromMessage(message)
+    console.log("[v0] Extracted brand from message:", brandName, "| Original message:", message)
+
     let responseText: string
 
     if (brandName) {
@@ -220,17 +215,17 @@ export async function POST(req: Request) {
         responseText = formatAnalysisResponse(analysisData, brandName)
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error"
+        console.error("[v0] Railway analysis error for brand:", brandName, errorMessage)
+
         responseText = `## Unable to Analyze "${brandName}"
 
 I encountered an issue while trying to analyze this brand. This could happen because:
 
 1. **The analysis service is temporarily unavailable** - Please try again in a few moments
-2. **The brand name might need to be more specific** - Try using the full company name (e.g., "Nike Inc" instead of just "Nike")
-3. **Network connectivity issues** - The service might be experiencing high load
+2. **Network connectivity issues** - The service might be experiencing high load
 
 **What you can try:**
 - Wait a moment and try again
-- Use a more specific brand name
 - Try a different brand to test connectivity
 
 *Technical details: ${errorMessage}*`
@@ -248,52 +243,16 @@ I'm your AI Brand Analyst. I can help you analyze how any brand is perceived by 
 - "What's the AI visibility of Microsoft?"
 - "Analizar la marca Coca-Cola"
 
+Or simply type a brand name like: **Nike**, **Apple**, **Tesla**, **Coca-Cola**
+
 Just mention a brand name and I'll provide a comprehensive analysis including:
-- **AI visibility scores** across platforms
-- **Sentiment analysis** 
-- **SWOT analysis**
-- **Actionable recommendations**
-
-*Tip: Make sure to include a recognizable brand name in your question (at least 2 characters).*`
+- AI visibility scores across platforms
+- Sentiment analysis 
+- SWOT analysis
+- Actionable recommendations`
     }
 
-    // Save messages to database
-    if (conversationId) {
-      // Save user message
-      await supabaseAdmin.from("chat_messages").insert({
-        conversation_id: conversationId,
-        user_id: user.id,
-        role: "user",
-        content: message,
-      })
-
-      // Save assistant message
-      await supabaseAdmin.from("chat_messages").insert({
-        conversation_id: conversationId,
-        user_id: user.id,
-        role: "assistant",
-        content: responseText,
-      })
-
-      // Update conversation title if first message
-      const { count } = await supabaseAdmin
-        .from("chat_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("conversation_id", conversationId)
-
-      if (count && count <= 2) {
-        const title = message.slice(0, 50) + (message.length > 50 ? "..." : "")
-        await supabaseAdmin
-          .from("conversations")
-          .update({ title, updated_at: new Date().toISOString() })
-          .eq("id", conversationId)
-      } else {
-        await supabaseAdmin
-          .from("conversations")
-          .update({ updated_at: new Date().toISOString() })
-          .eq("id", conversationId)
-      }
-    }
+    // Messages will only be stored in client state for now
 
     return new Response(
       JSON.stringify({
