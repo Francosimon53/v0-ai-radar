@@ -71,10 +71,8 @@ export function ChatClient({
     if (activeConversationId) {
       loadConversationMessages(activeConversationId)
       setIsNewChat(false)
-    } else {
-      setMessages([])
-      setIsNewChat(true)
     }
+    // Do NOT reset messages here - only handleNewConversation should do that
   }, [activeConversationId])
 
   const loadConversationMessages = async (conversationId: string) => {
@@ -372,7 +370,7 @@ export function ChatClient({
 
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <div className="max-w-3xl mx-auto space-y-6">
-            {messages.length === 0 && isNewChat ? (
+            {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center mb-4">
                   <Sparkles className="h-8 w-8 text-amber-400" />
