@@ -183,6 +183,94 @@ function formatAnalysisResponse(data: any, brandName: string): string {
   return response
 }
 
+async function saveAnalysisResult(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  userId: string,
+  brandName: string,
+  analysisData: any,
+): Promise<void> {
+  try {
+    // Build schema-safe payload with only guaranteed columns
+    const payload: Record<string, any> = {
+      user_id: userId,
+      brand_name: brandName,
+      analyzed_at: new Date().toISOString(),
+    }
+
+    // Add optional fields if they exist in the analysis data
+    if (analysisData.overall_score !== undefined) {
+      payload.rank = analysisData.overall_score
+    }
+
+    if (analysisData.share_of_voice !== undefined) {
+      payload.share_of_voice = analysisData.share_of_voice
+    }
+
+    // Store dimensional scores (including competitors if present)
+    const dimensionalScores: Record<string, any> = {}
+    if (analysisData.ai_visibility) {
+      dimensionalScores.ai_visibility = analysisData.ai_visibility
+    }
+    if (analysisData.sentiment) {
+      dimensionalScores.sentiment = analysisData.sentiment
+    }
+    if (analysisData.competitors && Array.isArray(analysisData.competitors)) {
+      // Store competitors inside dimensional_scores to avoid column issues
+      dimensionalScores.competitors = analysisData.competitors
+    }
+    if (Object.keys(dimensionalScores).length > 0) {
+      payload.dimensional_scores = dimensionalScores
+    }
+
+    // Store narrative analysis
+    if (analysisData.key_themes || analysisData.description) {
+      payload.narrative_analysis = {
+        key_themes: analysisData.key_themes || [],
+        description: analysisData.description || "",
+      }
+    }
+
+    // Store SWOT in threat_assessment
+    if (analysisData.swot) {
+      payload.threat_assessment = {
+        swot: analysisData.swot,
+      }
+    }
+
+    // Store recommendations
+    if (analysisData.recommendations && Array.isArray(analysisData.recommendations)) {
+      payload.recommendations = analysisData.recommendations
+    }
+
+    // Store executive summary if available
+    if (analysisData.summary || analysisData.executive_summary) {
+      payload.executive_summary = analysisData.summary || analysisData.executive_summary
+    }
+
+    // Store models used
+    if (analysisData.models_used) {
+      payload.models_used = analysisData.models_used
+    }
+
+    // Store processing time
+    if (analysisData.processing_time_seconds !== undefined) {
+      payload.processing_time_seconds = analysisData.processing_time_seconds
+    }
+
+    const { error } = await supabase.from("analysis_results").insert(payload)
+
+    if (error) {
+      // Log error but don't throw - we still want to return the response
+      console.error("[v0] Failed to save analysis result to DB:", error.message, error.details, error.hint)
+    } else {
+      console.log("[v0] Successfully saved analysis result to DB for brand:", brandName)
+    }
+  } catch (error) {
+    // Catch any unexpected errors - never fail the chat response
+    console.error("[v0] Unexpected error saving analysis result:", error instanceof Error ? error.message : error)
+  }
+}
+
 export async function POST(req: Request) {
   const { message, conversationId }: { message: string; conversationId?: string } = await req.json()
 
@@ -213,6 +301,10 @@ export async function POST(req: Request) {
       try {
         const analysisData = await callRailwayAnalysis(brandName)
         responseText = formatAnalysisResponse(analysisData, brandName)
+
+        saveAnalysisResult(supabase, user.id, brandName, analysisData).catch((err) => {
+          console.error("[v0] Background save failed:", err)
+        })
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error"
         console.error("[v0] Railway analysis error for brand:", brandName, errorMessage)
