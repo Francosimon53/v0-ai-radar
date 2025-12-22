@@ -57,6 +57,7 @@ export function ChatClient({
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [queriesUsed, setQueriesUsed] = useState(initialQueriesUsed)
+  const [isNewChat, setIsNewChat] = useState(true)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -66,12 +67,13 @@ export function ChatClient({
     scrollToBottom()
   }, [messages, scrollToBottom])
 
-  // Load messages when conversation changes
   useEffect(() => {
     if (activeConversationId) {
       loadConversationMessages(activeConversationId)
+      setIsNewChat(false)
     } else {
       setMessages([])
+      setIsNewChat(true)
     }
   }, [activeConversationId])
 
@@ -93,6 +95,10 @@ export function ChatClient({
   }
 
   const handleNewConversation = async () => {
+    setMessages([])
+    setIsNewChat(true)
+    setActiveConversationId(null)
+
     setIsCreatingConversation(true)
     try {
       const response = await fetch("/api/conversations", { method: "POST" })
@@ -100,7 +106,6 @@ export function ChatClient({
         const { conversation } = await response.json()
         setConversations([conversation, ...conversations])
         setActiveConversationId(conversation.id)
-        setMessages([])
       }
     } catch (error) {
       console.error("Failed to create conversation:", error)
@@ -131,7 +136,8 @@ export function ChatClient({
     const userMessage = input.trim()
     setInput("")
 
-    // Add user message to UI immediately
+    setIsNewChat(false)
+
     const userMessageObj: Message = {
       id: `user-${Date.now()}`,
       role: "user",
@@ -142,7 +148,6 @@ export function ChatClient({
 
     let conversationId = activeConversationId
 
-    // Create conversation if none exists
     if (!conversationId) {
       setIsCreatingConversation(true)
       try {
@@ -165,7 +170,6 @@ export function ChatClient({
       }
     }
 
-    // Send message to API
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -179,7 +183,6 @@ export function ChatClient({
       const data = await response.json()
 
       if (!response.ok) {
-        // Handle error response
         const errorMessage: Message = {
           id: `error-${Date.now()}`,
           role: "assistant",
@@ -187,7 +190,6 @@ export function ChatClient({
         }
         setMessages((prev) => [...prev, errorMessage])
       } else {
-        // Add assistant response to messages
         const assistantMessage: Message = {
           id: `assistant-${Date.now()}`,
           role: "assistant",
@@ -195,12 +197,10 @@ export function ChatClient({
         }
         setMessages((prev) => [...prev, assistantMessage])
 
-        // Update queries used counter
         if (typeof data.used === "number") {
           setQueriesUsed(data.used)
         }
 
-        // Update conversation ID if returned
         if (data.conversationId && !activeConversationId) {
           setActiveConversationId(data.conversationId)
         }
@@ -235,7 +235,6 @@ export function ChatClient({
 
   return (
     <div className="flex h-screen bg-zinc-950 text-slate-100">
-      {/* Sidebar */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-72 bg-zinc-900 border-r border-zinc-800 transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0",
@@ -243,7 +242,6 @@ export function ChatClient({
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Sidebar Header */}
           <div className="flex items-center justify-between p-4 border-b border-zinc-800">
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-amber-400" />
@@ -254,7 +252,6 @@ export function ChatClient({
             </Button>
           </div>
 
-          {/* New Conversation Button */}
           <div className="p-3">
             <Button
               onClick={handleNewConversation}
@@ -270,7 +267,6 @@ export function ChatClient({
             </Button>
           </div>
 
-          {/* Query Usage Badge - now uses local state */}
           <div className="px-3 pb-3">
             <div className="bg-zinc-800/50 rounded-lg px-3 py-2 text-sm">
               <div className="flex items-center justify-between text-slate-400">
@@ -289,7 +285,6 @@ export function ChatClient({
             </div>
           </div>
 
-          {/* Conversation List */}
           <div className="flex-1 overflow-y-auto px-3 pb-3">
             <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Recent Conversations</div>
             <div className="space-y-1">
@@ -326,7 +321,6 @@ export function ChatClient({
             </div>
           </div>
 
-          {/* Back to Dashboard */}
           <div className="p-3 border-t border-zinc-800">
             <Button
               variant="ghost"
@@ -340,9 +334,7 @@ export function ChatClient({
         </div>
       </aside>
 
-      {/* Main Chat Area */}
       <main className="flex-1 flex flex-col min-w-0">
-        {/* Chat Header */}
         <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50 print:hidden">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
@@ -378,10 +370,9 @@ export function ChatClient({
           </div>
         </header>
 
-        {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <div className="max-w-3xl mx-auto space-y-6">
-            {messages.length === 0 ? (
+            {messages.length === 0 && isNewChat ? (
               <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center mb-4">
                   <Sparkles className="h-8 w-8 text-amber-400" />
@@ -452,7 +443,6 @@ export function ChatClient({
           </div>
         </div>
 
-        {/* Input Area */}
         <div className="border-t border-zinc-800 bg-zinc-900/50 p-4 print:hidden">
           <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
             <div className="flex items-end gap-3">
@@ -487,7 +477,6 @@ export function ChatClient({
         </div>
       </main>
 
-      {/* Print Styles */}
       <style jsx global>{`
         @media print {
           body * {
