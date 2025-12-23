@@ -83,33 +83,58 @@ function extractBrandFromMessage(message: string): string | null {
 async function callRailwayAnalysis(brandName: string, competitors: string[] = []) {
   console.log("[v0] Calling Railway API for brand:", brandName)
 
-  const response = await fetch(`${RAILWAY_API_URL}/analyze`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      brand_name: brandName,
-      competitors,
-      depth: "standard",
-    }),
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
 
-  console.log("[v0] Railway API response status:", response.status)
+  try {
+    const response = await fetch(`${RAILWAY_API_URL}/analyze`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      // Backend expects brand_name (snake_case)
+      body: JSON.stringify({
+        brand_name: brandName,
+        competitors,
+        depth: "standard",
+      }),
+      signal: controller.signal,
+    })
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error("[v0] Railway API error response:", errorText)
-    throw new Error(`Railway API error: ${response.status}`)
-  }
+    clearTimeout(timeoutId)
+    console.log("[v0] Railway API response status:", response.status)
 
-  const result = await response.json()
-  console.log("[v0] Railway API result:", JSON.stringify(result).slice(0, 500))
+    if (!response.ok) {
+      let errorText: string
+      try {
+        errorText = await response.text()
+      } catch {
+        errorText = `HTTP ${response.status}`
+      }
+      console.error("[v0] Railway API error response:", errorText)
+      throw new Error(`Railway API error: ${response.status} - ${errorText}`)
+    }
 
-  if (result.success) {
-    return result.data
-  } else {
-    throw new Error(result.error || "Railway analysis failed")
+    let result: any
+    try {
+      result = await response.json()
+    } catch {
+      throw new Error("Invalid JSON response from Railway")
+    }
+
+    console.log("[v0] Railway API result:", JSON.stringify(result).slice(0, 500))
+
+    if (result.success) {
+      return result.data
+    } else {
+      throw new Error(result.error || "Railway analysis failed")
+    }
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Railway API request timed out after 30 seconds")
+    }
+    throw error
   }
 }
 
@@ -120,11 +145,59 @@ function formatAnalysisResponse(data: any, brandName: string): string {
 
   let response = `## Brand Analysis: ${brandName}\n\n`
 
-  if (data.overall_score !== undefined) {
+  // Handle consensus data from Railway response
+  if (data.consensus) {
+    if (data.consensus.overall_score !== undefined) {
+      response += `**Overall AI Brand Score:** ${data.consensus.overall_score}/100\n\n`
+    }
+
+    if (data.consensus.scores) {
+      response += `### Dimensional Scores\n`
+      for (const [dimension, score] of Object.entries(data.consensus.scores)) {
+        const label = dimension.charAt(0).toUpperCase() + dimension.slice(1).replace(/_/g, " ")
+        response += `- **${label}:** ${score}/100\n`
+      }
+      response += `\n`
+    }
+
+    if (data.consensus.models_used && data.consensus.models_used.length > 0) {
+      response += `*Models consulted: ${data.consensus.models_used.join(", ")}*\n\n`
+    }
+  }
+
+  // Handle individual model data
+  if (data.models) {
+    // Show model warnings for errors
+    const errors = Object.entries(data.models)
+      .filter(([_, v]: [string, any]) => v.status === "error")
+      .map(([k]) => k)
+
+    if (errors.length > 0) {
+      response += `> ⚠️ *Some models returned errors: ${errors.join(", ")}*\n\n`
+    }
+
+    // Extract positioning from OpenAI if available
+    const openaiData = data.models.openai?.data
+    if (openaiData?.positioning) {
+      response += `### Brand Positioning\n${openaiData.positioning}\n\n`
+    }
+
+    // Extract attributes if available
+    if (openaiData?.attributes && openaiData.attributes.length > 0) {
+      response += `### Key Attributes\n`
+      openaiData.attributes.forEach((attr: string) => {
+        response += `- ${attr}\n`
+      })
+      response += `\n`
+    }
+  }
+
+  // Legacy format support (in case Railway returns different structure)
+  if (data.overall_score !== undefined && !data.consensus) {
     response += `**Overall AI Brand Score:** ${data.overall_score}/100\n\n`
   }
 
-  if (data.ai_visibility) {
+  if (data.ai_visibility && !data.consensus) {
     response += `### AI Visibility Scores\n`
     for (const [platform, score] of Object.entries(data.ai_visibility)) {
       response += `- **${platform}:** ${score}/100\n`
@@ -176,8 +249,8 @@ function formatAnalysisResponse(data: any, brandName: string): string {
     response += `\n`
   }
 
-  if (data.analyzed_at) {
-    response += `---\n*Analysis generated at ${new Date(data.analyzed_at).toLocaleString()}*`
+  if (data.timestamp || data.analyzed_at) {
+    response += `---\n*Analysis generated at ${new Date(data.timestamp || data.analyzed_at).toLocaleString()}*`
   }
 
   return response

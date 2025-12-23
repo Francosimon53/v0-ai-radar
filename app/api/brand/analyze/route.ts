@@ -6,7 +6,8 @@ import { createServerClient, createServiceClient } from "@/lib/supabase/server"
 const RAILWAY_API_URL = process.env.RAILWAY_MCP_URL || "https://ai-vibes-mcp-server-production.up.railway.app"
 
 interface AnalyzeRequest {
-  brandName: string
+  brandName?: string
+  brand_name?: string // Accept both camelCase and snake_case from client
   competitors?: string[]
 }
 
@@ -43,19 +44,22 @@ export async function POST(req: Request) {
     // Parse and validate input
     const body: AnalyzeRequest = await req.json()
 
-    if (!body.brandName || typeof body.brandName !== "string") {
+    const inputBrandName = body.brandName || body.brand_name
+
+    if (!inputBrandName || typeof inputBrandName !== "string") {
       return NextResponse.json(
         {
+          success: false,
           error: "brandName is required",
-          hint: "Send { brandName: 'Nike' } in request body. The API internally converts to brand_name (snake_case) for Railway.",
+          hint: "Send { brandName: 'Nike' } or { brand_name: 'Nike' } in request body.",
         },
         { status: 400 },
       )
     }
 
-    const brandName = body.brandName.trim()
+    const brandName = inputBrandName.trim()
     if (brandName.length < 2) {
-      return NextResponse.json({ error: "Brand name must be at least 2 characters" }, { status: 400 })
+      return NextResponse.json({ success: false, error: "Brand name must be at least 2 characters" }, { status: 400 })
     }
 
     // Check authentication (optional - allow unauthenticated for "Start Free Analysis")
@@ -69,37 +73,48 @@ export async function POST(req: Request) {
     // IMPORTANT: Backend expects brand_name (snake_case), NOT brandName
     console.log("[brand/analyze] Calling Railway API for brand:", brandName)
 
-    const railwayResponse = await fetch(`${RAILWAY_API_URL}/analyze`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      // Backend expects brand_name (snake_case)
-      body: JSON.stringify({
-        brand_name: brandName,
-        competitors: body.competitors || [],
-        depth: "standard",
-      }),
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
 
-    if (!railwayResponse.ok) {
-      const errorText = await railwayResponse.text()
-      console.error("[brand/analyze] Railway API error:", railwayResponse.status, errorText)
-
-      // Check for specific snake_case error
-      if (errorText.includes("brand_name is required")) {
+    let railwayResponse: Response
+    try {
+      railwayResponse = await fetch(`${RAILWAY_API_URL}/analyze`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        // Backend expects brand_name (snake_case)
+        body: JSON.stringify({
+          brand_name: brandName,
+          competitors: body.competitors || [],
+          depth: "standard",
+        }),
+        signal: controller.signal,
+      })
+    } catch (fetchError) {
+      clearTimeout(timeoutId)
+      if (fetchError instanceof Error && fetchError.name === "AbortError") {
         return NextResponse.json(
-          {
-            error: "Railway API requires brand_name (snake_case)",
-            hint: "Internal error - the request body should use brand_name, not brandName",
-            status: railwayResponse.status,
-          },
-          { status: 502 },
+          { success: false, error: "Request timed out", details: "Railway API did not respond within 30 seconds" },
+          { status: 504 },
         )
       }
+      throw fetchError
+    }
+    clearTimeout(timeoutId)
+
+    if (!railwayResponse.ok) {
+      let errorText: string
+      try {
+        errorText = await railwayResponse.text()
+      } catch {
+        errorText = `HTTP ${railwayResponse.status}`
+      }
+      console.error("[brand/analyze] Railway API error:", railwayResponse.status, errorText)
 
       return NextResponse.json(
         {
+          success: false,
           error: "Failed to analyze brand",
           details: errorText,
           status: railwayResponse.status,
@@ -108,11 +123,21 @@ export async function POST(req: Request) {
       )
     }
 
-    const result: RailwayResponse = await railwayResponse.json()
+    let result: RailwayResponse
+    try {
+      result = await railwayResponse.json()
+    } catch (parseError) {
+      console.error("[brand/analyze] Failed to parse Railway response:", parseError)
+      return NextResponse.json(
+        { success: false, error: "Invalid response from Railway API", details: "JSON parse error" },
+        { status: 502 },
+      )
+    }
 
     if (!result.success || !result.data) {
       return NextResponse.json(
         {
+          success: false,
           error: result.error || "Analysis failed",
           details: "Railway returned success=false or no data",
         },
@@ -122,103 +147,66 @@ export async function POST(req: Request) {
 
     const analysisData = result.data
 
-    // Save to Supabase using SERVICE ROLE KEY (bypasses RLS)
-    // Wrapped in try/catch - never fail the response due to DB errors
+    // If you want persistence, add `results jsonb` column to analysis_results table
     let savedToDb = false
     let dbError: string | null = null
 
-    try {
-      const supabaseAdmin = createServiceClient()
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const supabaseAdmin = createServiceClient()
 
-      // Build payload with ONLY columns that exist in public.analysis_results
-      // NOTE: There is NO `results` column - do NOT try to insert into it
-      const payload: Record<string, unknown> = {
-        brand_name: analysisData.brand_name || brandName,
-        analyzed_at: analysisData.timestamp || new Date().toISOString(),
-      }
-
-      // Add user_id if authenticated
-      if (userId) {
-        payload.user_id = userId
-      }
-
-      // competitors (jsonb) - store array directly
-      if (analysisData.competitors && Array.isArray(analysisData.competitors)) {
-        payload.competitors = analysisData.competitors
-      }
-
-      // consensus_score (double precision)
-      if (analysisData.consensus?.overall_score !== undefined) {
-        payload.consensus_score = analysisData.consensus.overall_score
-      }
-
-      // dimensional_scores (jsonb) - store consensus scores
-      if (analysisData.consensus?.scores) {
-        payload.dimensional_scores = analysisData.consensus.scores
-      }
-
-      // narrative_analysis (jsonb) - derive from models data
-      const positioning = analysisData.models?.openai?.data?.positioning
-      if (positioning) {
-        payload.narrative_analysis = { positioning }
-      }
-
-      // executive_summary (text) - short summary from positioning
-      if (positioning && typeof positioning === "string") {
-        payload.executive_summary = positioning.substring(0, 500)
-      }
-
-      // recommendations (jsonb) - from attributes
-      const attributes = analysisData.models?.openai?.data?.attributes
-      if (attributes && Array.isArray(attributes)) {
-        payload.recommendations = attributes
-      }
-
-      // models_used (array) - from consensus or derive from models object
-      if (analysisData.consensus?.models_used) {
-        payload.models_used = analysisData.consensus.models_used
-      } else if (analysisData.models) {
-        // Derive from models where status=success
-        const modelsUsed = Object.entries(analysisData.models)
-          .filter(([_, v]) => v.status === "success")
-          .map(([k]) => k)
-        if (modelsUsed.length > 0) {
-          payload.models_used = modelsUsed
+        // Build payload with ONLY columns that are guaranteed to exist
+        // NOTE: Do NOT include `results` column unless you've added it manually
+        const payload: Record<string, unknown> = {
+          brand_name: analysisData.brand_name || brandName,
+          analyzed_at: analysisData.timestamp || new Date().toISOString(),
         }
+
+        // Add user_id if authenticated
+        if (userId) {
+          payload.user_id = userId
+        }
+
+        // Optional fields - only add if data exists
+        if (analysisData.consensus?.overall_score !== undefined) {
+          payload.consensus_score = analysisData.consensus.overall_score
+        }
+
+        if (analysisData.consensus?.scores) {
+          payload.dimensional_scores = analysisData.consensus.scores
+        }
+
+        if (analysisData.consensus?.models_used) {
+          payload.models_used = analysisData.consensus.models_used
+        }
+
+        if (analysisData.processing_time_seconds !== undefined) {
+          payload.processing_time_seconds = Math.round(analysisData.processing_time_seconds)
+        }
+
+        if (analysisData.tokens_used !== undefined) {
+          payload.tokens_used = analysisData.tokens_used
+        }
+
+        if (analysisData.cost_usd !== undefined) {
+          payload.cost_usd = analysisData.cost_usd
+        }
+
+        console.log("[brand/analyze] Saving to analysis_results:", Object.keys(payload))
+
+        const { error: insertError } = await supabaseAdmin.from("analysis_results").insert(payload)
+
+        if (insertError) {
+          console.error("[brand/analyze] DB insert error (non-blocking):", insertError.message)
+          dbError = insertError.message
+        } else {
+          savedToDb = true
+        }
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "Unknown DB error"
+        console.error("[brand/analyze] DB error (non-blocking):", errorMsg)
+        dbError = errorMsg
       }
-
-      // tokens_used (integer)
-      if (analysisData.tokens_used !== undefined) {
-        payload.tokens_used = analysisData.tokens_used
-      }
-
-      // cost_usd (numeric)
-      if (analysisData.cost_usd !== undefined) {
-        payload.cost_usd = analysisData.cost_usd
-      }
-
-      // processing_time_seconds (integer)
-      if (analysisData.processing_time_seconds !== undefined) {
-        payload.processing_time_seconds = Math.round(analysisData.processing_time_seconds)
-      }
-
-      console.log("[brand/analyze] Saving to analysis_results:", Object.keys(payload))
-
-      const { error: insertError } = await supabaseAdmin.from("analysis_results").insert(payload)
-
-      if (insertError) {
-        // Log but don't throw - we still return the analysis
-        console.error("[brand/analyze] DB insert error:", insertError.message, insertError.details, insertError.hint)
-        dbError = insertError.message
-      } else {
-        savedToDb = true
-        console.log("[brand/analyze] Successfully saved to analysis_results for brand:", brandName)
-      }
-    } catch (err) {
-      // Catch any unexpected errors - never fail the response
-      const errorMsg = err instanceof Error ? err.message : "Unknown DB error"
-      console.error("[brand/analyze] Unexpected DB error:", errorMsg)
-      dbError = errorMsg
     }
 
     // Always return the analysis response, even if DB save failed
@@ -232,6 +220,7 @@ export async function POST(req: Request) {
     console.error("[brand/analyze] Unexpected error:", error)
     return NextResponse.json(
       {
+        success: false,
         error: "Failed to process analysis request",
         details: error instanceof Error ? error.message : "Unknown error",
       },
