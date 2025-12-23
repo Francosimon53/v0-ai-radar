@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { Bell, LayoutDashboard, Settings, Users, FileText, MessageSquare } from "lucide-react"
+import { Bell, LayoutDashboard, Settings, Users, FileText, MessageSquare, BarChart3 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,7 @@ export default function DashboardLayoutClient({
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "AI Chat", href: "/chat", icon: MessageSquare },
+    { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
     { name: "Competitors", href: "/dashboard/competitors", icon: Users },
     { name: "Reports", href: "/dashboard/reports", icon: FileText },
     { name: "Alerts", href: "/dashboard/alerts", icon: Bell },
@@ -33,7 +34,7 @@ export default function DashboardLayoutClient({
 
         <nav className="space-y-1 p-4">
           {navigation.map((item) => {
-            const isActive = pathname === item.href
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
             const Icon = item.icon
 
             return (
@@ -42,7 +43,7 @@ export default function DashboardLayoutClient({
                   variant="ghost"
                   className={`w-full justify-start ${
                     isActive
-                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      ? "bg-orange-600 text-white hover:bg-orange-700"
                       : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
                   }`}
                 >
