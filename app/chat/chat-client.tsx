@@ -19,11 +19,13 @@ import {
   Check,
   RefreshCw,
   Radar,
+  FileDown,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { generateBrandAnalysisPDF, parseAnalysisFromMessage } from "@/lib/pdf-generator"
 
 interface Conversation {
   id: string
@@ -58,6 +60,35 @@ const TypingIndicator = () => (
 )
 
 const QUICK_BRANDS = ["Nike", "Apple", "Tesla", "Coca-Cola", "Amazon", "Google", "Netflix", "Spotify"]
+
+function isBrandAnalysisMessage(content: string): boolean {
+  const analysisIndicators = [
+    /brand\s*(analysis|score|perception)/i,
+    /overall\s*score/i,
+    /sentiment\s*analysis/i,
+    /swot/i,
+    /ai\s*visibility/i,
+    /dimensional\s*scores?/i,
+    /share\s*of\s*voice/i,
+    /brand\s*positioning/i,
+    /recommendation/i,
+    /\d+\/100/,
+  ]
+  return analysisIndicators.some((pattern) => pattern.test(content))
+}
+
+function extractBrandFromContent(content: string): string | undefined {
+  const patterns = [
+    /(?:analysis of|analyzing|brand[:\s]+)([A-Z][a-zA-Z]+)/i,
+    /^##\s*(?:Brand\s*Analysis[:\s]*)?([A-Z][a-zA-Z]+)/m,
+    /\*\*([A-Z][a-zA-Z]+)\*\*/,
+  ]
+  for (const pattern of patterns) {
+    const match = content.match(pattern)
+    if (match) return match[1]
+  }
+  return undefined
+}
 
 export function ChatClient({
   initialConversations,
@@ -284,17 +315,23 @@ export function ChatClient({
     }
   }, [activeConversationId])
 
+  const handleExportMessagePDF = useCallback((content: string) => {
+    const brandName = extractBrandFromContent(content)
+    const analysis = parseAnalysisFromMessage(content, brandName)
+    generateBrandAnalysisPDF(analysis)
+  }, [])
+
   const formatTime = (timestamp?: number) => {
     if (!timestamp) return ""
     return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   }
 
   return (
-    <div className="flex h-screen bg-zinc-950 text-slate-100">
+    <div className="flex h-screen bg-zinc-950 text-slate-100 print:bg-white print:text-black">
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-72 bg-zinc-900 border-r border-zinc-800 transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-72 bg-zinc-900 border-r border-zinc-800 transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0 print:hidden",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -392,7 +429,7 @@ export function ChatClient({
       </aside>
 
       {/* Main chat area */}
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 print:block">
         <header className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50 print:hidden">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
@@ -489,7 +526,7 @@ export function ChatClient({
                 <div
                   key={message.id}
                   className={cn(
-                    "flex gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300",
+                    "flex gap-4 transition-all duration-300",
                     message.role === "user" ? "justify-end" : "justify-start",
                   )}
                   style={{ animationDelay: `${index * 50}ms` }}
@@ -539,17 +576,29 @@ export function ChatClient({
                     <div className="flex items-center gap-2 mt-1.5 px-2">
                       <span className="text-xs text-slate-500">{formatTime(message.timestamp)}</span>
                       {message.role === "assistant" && (
-                        <button
-                          onClick={() => handleCopyMessage(message.id, message.content)}
-                          className="text-slate-500 hover:text-slate-300 transition-colors"
-                          title="Copy message"
-                        >
-                          {copiedMessageId === message.id ? (
-                            <Check className="h-3.5 w-3.5 text-green-400" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5" />
+                        <>
+                          <button
+                            onClick={() => handleCopyMessage(message.id, message.content)}
+                            className="text-slate-500 hover:text-slate-300 transition-colors"
+                            title="Copy message"
+                          >
+                            {copiedMessageId === message.id ? (
+                              <Check className="h-3.5 w-3.5 text-green-400" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                          {isBrandAnalysisMessage(message.content) && (
+                            <button
+                              onClick={() => handleExportMessagePDF(message.content)}
+                              className="text-slate-500 hover:text-amber-400 transition-colors flex items-center gap-1"
+                              title="Export as PDF Report"
+                            >
+                              <FileDown className="h-3.5 w-3.5" />
+                              <span className="text-xs">PDF</span>
+                            </button>
                           )}
-                        </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -562,7 +611,7 @@ export function ChatClient({
               ))
             )}
             {isLoading && (
-              <div className="flex gap-4 justify-start animate-in fade-in duration-300">
+              <div className="flex gap-4 justify-start transition-all duration-300">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-500/20">
                   <Radar className="h-5 w-5 text-white animate-pulse" />
                 </div>
@@ -612,25 +661,6 @@ export function ChatClient({
           </form>
         </div>
       </main>
-
-      <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          .max-w-3xl,
-          .max-w-3xl * {
-            visibility: visible;
-          }
-          .max-w-3xl {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            padding: 20px;
-          }
-        }
-      `}</style>
     </div>
   )
 }
