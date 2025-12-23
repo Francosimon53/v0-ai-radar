@@ -137,17 +137,23 @@ async function processConfig(supabase: ReturnType<typeof createServiceClient>, c
   // Upload report
   const reportPath = await uploadReport(pdfBuffer, config.user_id, analysisResult.id)
 
-  // Save to database
+  // The analysis_results table has specific columns, not a generic results jsonb
   await supabase.from("analysis_results").insert({
     id: analysisResult.id,
     config_id: config.id,
     user_id: config.user_id,
-    brand: config.brand,
-    timestamp: analysisResult.timestamp,
-    brand_strength_index: analysisResult.dimensional.brandStrengthIndex,
-    share_of_voice: analysisResult.shareOfVoice[config.brand]?.mentionRate || 0,
-    report_path: reportPath,
-    full_result: analysisResult,
+    brand_name: config.brand,
+    analyzed_at: analysisResult.timestamp,
+    consensus_score: analysisResult.dimensional.brandStrengthIndex,
+    // Store dimensional scores as jsonb
+    dimensional_scores: {
+      brandStrengthIndex: analysisResult.dimensional.brandStrengthIndex,
+      shareOfVoice: analysisResult.shareOfVoice[config.brand]?.mentionRate || 0,
+    },
+    // Store narrative analysis
+    narrative_analysis: analysisResult.narrative || null,
+    // Store recommendations
+    recommendations: analysisResult.recommendations || null,
   })
 
   // Check for alerts (compare to previous)
