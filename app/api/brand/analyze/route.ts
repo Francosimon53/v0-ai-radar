@@ -40,13 +40,31 @@ interface RailwayResponse {
 }
 
 export async function POST(req: Request) {
+  console.log("🔵 [Brand/Analyze API] POST iniciado")
+
   try {
     // Parse and validate input
-    const body: AnalyzeRequest = await req.json()
+    let body: AnalyzeRequest
+    try {
+      body = await req.json()
+      console.log("📥 [Brand/Analyze] Body recibido:", JSON.stringify(body, null, 2))
+    } catch (parseError) {
+      console.error("❌ [Brand/Analyze] Error parsing body:", parseError)
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid JSON body",
+          message: parseError instanceof Error ? parseError.message : "Parse error",
+        },
+        { status: 400 },
+      )
+    }
 
     const inputBrandName = body.brandName || body.brand_name
+    console.log("📥 [Brand/Analyze] Brand name input:", inputBrandName)
 
     if (!inputBrandName || typeof inputBrandName !== "string") {
+      console.error("❌ [Brand/Analyze] brandName faltante o inválido")
       return NextResponse.json(
         {
           success: false,
@@ -59,46 +77,56 @@ export async function POST(req: Request) {
 
     const brandName = inputBrandName.trim()
     if (brandName.length < 2) {
+      console.error("❌ [Brand/Analyze] Brand name muy corto:", brandName)
       return NextResponse.json({ success: false, error: "Brand name must be at least 2 characters" }, { status: 400 })
     }
 
     // Check authentication (optional - allow unauthenticated for "Start Free Analysis")
+    console.log("🔌 [Brand/Analyze] Verificando autenticación...")
     const supabase = await createServerClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
     const userId = user?.id || null
+    console.log("📥 [Brand/Analyze] User ID:", userId || "no autenticado")
 
     // Call Railway API with snake_case key
     // IMPORTANT: Backend expects brand_name (snake_case), NOT brandName
-    console.log("[brand/analyze] Calling Railway API for brand:", brandName)
+    console.log("🔌 [Brand/Analyze] Llamando Railway API para marca:", brandName)
+    console.log("🔌 [Brand/Analyze] Railway URL:", `${RAILWAY_API_URL}/analyze`)
 
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
 
     let railwayResponse: Response
     try {
+      const requestBody = {
+        brand_name: brandName,
+        competitors: body.competitors || [],
+        depth: "standard",
+      }
+      console.log("🔌 [Brand/Analyze] Request body:", JSON.stringify(requestBody))
+
       railwayResponse = await fetch(`${RAILWAY_API_URL}/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         // Backend expects brand_name (snake_case)
-        body: JSON.stringify({
-          brand_name: brandName,
-          competitors: body.competitors || [],
-          depth: "standard",
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       })
+      console.log("✅ [Brand/Analyze] Railway respondió con status:", railwayResponse.status)
     } catch (fetchError) {
       clearTimeout(timeoutId)
       if (fetchError instanceof Error && fetchError.name === "AbortError") {
+        console.error("❌ [Brand/Analyze] Railway timeout después de 30s")
         return NextResponse.json(
           { success: false, error: "Request timed out", details: "Railway API did not respond within 30 seconds" },
           { status: 504 },
         )
       }
+      console.error("❌ [Brand/Analyze] Fetch error:", fetchError)
       throw fetchError
     }
     clearTimeout(timeoutId)
@@ -110,7 +138,7 @@ export async function POST(req: Request) {
       } catch {
         errorText = `HTTP ${railwayResponse.status}`
       }
-      console.error("[brand/analyze] Railway API error:", railwayResponse.status, errorText)
+      console.error("❌ [Brand/Analyze] Railway error:", railwayResponse.status, errorText)
 
       return NextResponse.json(
         {
@@ -126,8 +154,9 @@ export async function POST(req: Request) {
     let result: RailwayResponse
     try {
       result = await railwayResponse.json()
+      console.log("✅ [Brand/Analyze] Railway JSON parseado, keys:", Object.keys(result))
     } catch (parseError) {
-      console.error("[brand/analyze] Failed to parse Railway response:", parseError)
+      console.error("❌ [Brand/Analyze] Error parseando Railway response:", parseError)
       return NextResponse.json(
         { success: false, error: "Invalid response from Railway API", details: "JSON parse error" },
         { status: 502 },
@@ -135,6 +164,7 @@ export async function POST(req: Request) {
     }
 
     if (!result.success || !result.data) {
+      console.error("❌ [Brand/Analyze] Railway success=false o sin data:", result.error)
       return NextResponse.json(
         {
           success: false,
@@ -145,6 +175,7 @@ export async function POST(req: Request) {
       )
     }
 
+    console.log("✅ [Brand/Analyze] Análisis exitoso para:", brandName)
     const analysisData = result.data
 
     // If you want persistence, add `results jsonb` column to analysis_results table
@@ -152,6 +183,7 @@ export async function POST(req: Request) {
     let dbError: string | null = null
 
     if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.log("💾 [Brand/Analyze] Iniciando guardado en Supabase...")
       try {
         const supabaseAdmin = createServiceClient()
 
@@ -192,24 +224,33 @@ export async function POST(req: Request) {
           payload.cost_usd = analysisData.cost_usd
         }
 
-        console.log("[brand/analyze] Saving to analysis_results:", Object.keys(payload))
+        console.log("💾 [Brand/Analyze] Payload keys:", Object.keys(payload))
 
         const { error: insertError } = await supabaseAdmin.from("analysis_results").insert(payload)
 
         if (insertError) {
-          console.error("[brand/analyze] DB insert error (non-blocking):", insertError.message)
+          console.error(
+            "❌ [Brand/Analyze] DB insert error (non-blocking):",
+            insertError.message,
+            insertError.details,
+            insertError.hint,
+          )
           dbError = insertError.message
         } else {
+          console.log("✅ [Brand/Analyze] Guardado exitoso en DB")
           savedToDb = true
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Unknown DB error"
-        console.error("[brand/analyze] DB error (non-blocking):", errorMsg)
+        console.error("❌ [Brand/Analyze] DB error (non-blocking):", errorMsg)
         dbError = errorMsg
       }
+    } else {
+      console.log("📥 [Brand/Analyze] SUPABASE_SERVICE_ROLE_KEY no disponible, saltando persistencia")
     }
 
     // Always return the analysis response, even if DB save failed
+    console.log("✅ [Brand/Analyze] Enviando respuesta exitosa, savedToDb:", savedToDb)
     return NextResponse.json({
       success: true,
       data: analysisData,
@@ -217,12 +258,13 @@ export async function POST(req: Request) {
       dbError,
     })
   } catch (error) {
-    console.error("[brand/analyze] Unexpected error:", error)
+    console.error("❌ [Brand/Analyze] Error inesperado:", error)
     return NextResponse.json(
       {
         success: false,
         error: "Failed to process analysis request",
-        details: error instanceof Error ? error.message : "Unknown error",
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : undefined) : undefined,
       },
       { status: 500 },
     )

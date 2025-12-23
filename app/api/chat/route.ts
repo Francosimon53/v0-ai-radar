@@ -1,4 +1,5 @@
 import { createServerClient } from "@/lib/supabase/server"
+import { generateText } from "ai"
 
 export const maxDuration = 60
 
@@ -81,12 +82,15 @@ function extractBrandFromMessage(message: string): string | null {
 }
 
 async function callRailwayAnalysis(brandName: string, competitors: string[] = []) {
-  console.log("[v0] Calling Railway API for brand:", brandName)
+  console.log("🔌 [Railway] Iniciando llamada para marca:", brandName)
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
 
   try {
+    console.log("🔌 [Railway] URL:", `${RAILWAY_API_URL}/analyze`)
+    console.log("🔌 [Railway] Body:", JSON.stringify({ brand_name: brandName, competitors, depth: "standard" }))
+
     const response = await fetch(`${RAILWAY_API_URL}/analyze`, {
       method: "POST",
       headers: {
@@ -102,7 +106,7 @@ async function callRailwayAnalysis(brandName: string, competitors: string[] = []
     })
 
     clearTimeout(timeoutId)
-    console.log("[v0] Railway API response status:", response.status)
+    console.log("✅ [Railway] Response status:", response.status)
 
     if (!response.ok) {
       let errorText: string
@@ -111,7 +115,7 @@ async function callRailwayAnalysis(brandName: string, competitors: string[] = []
       } catch {
         errorText = `HTTP ${response.status}`
       }
-      console.error("[v0] Railway API error response:", errorText)
+      console.error("❌ [Railway] Error response:", errorText)
       throw new Error(`Railway API error: ${response.status} - ${errorText}`)
     }
 
@@ -119,19 +123,23 @@ async function callRailwayAnalysis(brandName: string, competitors: string[] = []
     try {
       result = await response.json()
     } catch {
+      console.error("❌ [Railway] JSON parse failed")
       throw new Error("Invalid JSON response from Railway")
     }
 
-    console.log("[v0] Railway API result:", JSON.stringify(result).slice(0, 500))
+    console.log("✅ [Railway] Result keys:", Object.keys(result))
+    console.log("✅ [Railway] Success:", result.success)
 
     if (result.success) {
       return result.data
     } else {
+      console.error("❌ [Railway] Analysis failed:", result.error)
       throw new Error(result.error || "Railway analysis failed")
     }
   } catch (error) {
     clearTimeout(timeoutId)
     if (error instanceof Error && error.name === "AbortError") {
+      console.error("❌ [Railway] Request timed out after 30s")
       throw new Error("Railway API request timed out after 30 seconds")
     }
     throw error
@@ -262,6 +270,8 @@ async function saveAnalysisResult(
   brandName: string,
   analysisData: any,
 ): Promise<void> {
+  console.log("💾 [Supabase] Iniciando guardado para:", brandName)
+
   try {
     // Build schema-safe payload with only guaranteed columns
     const payload: Record<string, any> = {
@@ -330,57 +340,127 @@ async function saveAnalysisResult(
       payload.processing_time_seconds = analysisData.processing_time_seconds
     }
 
+    console.log("💾 [Supabase] Payload keys:", Object.keys(payload))
+
     const { error } = await supabase.from("analysis_results").insert(payload)
 
     if (error) {
       // Log error but don't throw - we still want to return the response
-      console.error("[v0] Failed to save analysis result to DB:", error.message, error.details, error.hint)
+      console.error("❌ [Supabase] Insert error:", error.message, error.details, error.hint)
     } else {
-      console.log("[v0] Successfully saved analysis result to DB for brand:", brandName)
+      console.log("✅ [Supabase] Guardado exitoso para:", brandName)
     }
   } catch (error) {
     // Catch any unexpected errors - never fail the chat response
-    console.error("[v0] Unexpected error saving analysis result:", error instanceof Error ? error.message : error)
+    console.error("❌ [Supabase] Error inesperado:", error instanceof Error ? error.message : error)
+  }
+}
+
+async function conversationalResponse(message: string): Promise<string> {
+  console.log("💬 [Chat API] Iniciando respuesta conversacional")
+
+  const systemPrompt = `Eres un asistente especializado en análisis de marcas con AI. Tu nombre es AI Brand Analyst.
+
+Puedes:
+- Analizar cualquier marca mencionada (Nike, Apple, Tesla, Coca-Cola, etc.)
+- Proporcionar scores de percepción de marca basados en cómo los sistemas de AI (ChatGPT, Claude, Gemini, Perplexity) perciben las marcas
+- Dar recomendaciones estratégicas de branding
+- Responder preguntas sobre branding, marketing y posicionamiento de marca
+
+Para analizar una marca, el usuario solo necesita mencionarla en el chat.
+
+Responde de manera amigable y profesional. Si el usuario saluda, responde cordialmente y explica brevemente lo que puedes hacer. Si preguntan sobre tus capacidades, explícalas claramente.
+
+Siempre responde en el mismo idioma que el usuario.`
+
+  try {
+    const { text } = await generateText({
+      model: "anthropic/claude-sonnet-4-20250514",
+      system: systemPrompt,
+      prompt: message,
+      maxTokens: 1024,
+    })
+
+    console.log("✅ [Chat API] Respuesta conversacional generada")
+    return text
+  } catch (error) {
+    console.error("❌ [Chat API] Error en respuesta conversacional:", error)
+    // Fallback response if AI fails
+    return `¡Hola! Soy tu AI Brand Analyst. Puedo ayudarte a analizar cómo cualquier marca es percibida por sistemas de AI como ChatGPT, Claude, Gemini y Perplexity.
+
+**Para empezar, simplemente menciona una marca:**
+- "Analiza Nike"
+- "¿Cómo perciben a Apple?"
+- "Tesla"
+- "Coca-Cola"
+
+Te proporcionaré un análisis completo incluyendo scores de visibilidad, análisis de sentimiento, SWOT y recomendaciones estratégicas.`
   }
 }
 
 export async function POST(req: Request) {
-  const { message, conversationId }: { message: string; conversationId?: string } = await req.json()
+  console.log("🔵 [Chat API] POST iniciado")
 
+  let body: { message: string; conversationId?: string }
+
+  try {
+    body = await req.json()
+    console.log("📥 [Chat API] Body recibido:", JSON.stringify(body, null, 2))
+  } catch (parseError) {
+    console.error("❌ [Chat API] Error parsing body:", parseError)
+    return new Response(
+      JSON.stringify({
+        error: "Invalid JSON body",
+        message: parseError instanceof Error ? parseError.message : "Parse error",
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    )
+  }
+
+  const { message, conversationId } = body
+
+  console.log("🔌 [Chat API] Creando cliente Supabase...")
   const supabase = await createServerClient()
 
+  console.log("🔌 [Chat API] Obteniendo usuario...")
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) {
+    console.error("❌ [Chat API] Usuario no autenticado")
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
     })
   }
+  console.log("✅ [Chat API] Usuario autenticado:", user.id)
 
   // Get plan info (simplified, doesn't require chat_messages table)
   const { used } = await getUserPlanAndUsage(user.id)
+  console.log("📥 [Chat API] Queries usadas:", used)
 
   try {
     const brandName = extractBrandFromMessage(message)
-    console.log("[v0] Extracted brand from message:", brandName, "| Original message:", message)
+    console.log("📥 [Chat API] Marca extraída:", brandName, "| Mensaje original:", message)
 
     let responseText: string
 
     if (brandName) {
       // Call Railway API for brand analysis
+      console.log("🔌 [Chat API] Iniciando análisis para marca:", brandName)
       try {
         const analysisData = await callRailwayAnalysis(brandName)
+        console.log("✅ [Chat API] Análisis completado, formateando respuesta...")
         responseText = formatAnalysisResponse(analysisData, brandName)
 
+        console.log("💾 [Chat API] Guardando resultado en background...")
         saveAnalysisResult(supabase, user.id, brandName, analysisData).catch((err) => {
-          console.error("[v0] Background save failed:", err)
+          console.error("❌ [Chat API] Background save failed:", err)
         })
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error"
-        console.error("[v0] Railway analysis error for brand:", brandName, errorMessage)
+        console.error("❌ [Chat API] Error en análisis Railway:", errorMessage)
 
         responseText = `## Unable to Analyze "${brandName}"
 
@@ -396,29 +476,11 @@ I encountered an issue while trying to analyze this brand. This could happen bec
 *Technical details: ${errorMessage}*`
       }
     } else {
-      // No brand detected - provide helpful response
-      responseText = `## Welcome to AI Brand Analysis
-
-I'm your AI Brand Analyst. I can help you analyze how any brand is perceived by AI systems like ChatGPT, Claude, Gemini, and Perplexity.
-
-**To get started, try asking:**
-- "Analyze Nike's brand perception"
-- "How is Apple perceived by AI?"
-- "Run an analysis for Tesla"
-- "What's the AI visibility of Microsoft?"
-- "Analizar la marca Coca-Cola"
-
-Or simply type a brand name like: **Nike**, **Apple**, **Tesla**, **Coca-Cola**
-
-Just mention a brand name and I'll provide a comprehensive analysis including:
-- AI visibility scores across platforms
-- Sentiment analysis 
-- SWOT analysis
-- Actionable recommendations`
+      console.log("💬 [Chat API] No se detectó marca, usando modo conversacional")
+      responseText = await conversationalResponse(message)
     }
 
-    // Messages will only be stored in client state for now
-
+    console.log("✅ [Chat API] Enviando respuesta exitosa")
     return new Response(
       JSON.stringify({
         response: responseText,
@@ -431,11 +493,12 @@ Just mention a brand name and I'll provide a comprehensive analysis including:
       },
     )
   } catch (error) {
-    console.error("[v0] Chat API error:", error)
+    console.error("❌ [Chat API] Error general:", error)
     return new Response(
       JSON.stringify({
         error: "Failed to process message",
-        details: error instanceof Error ? error.message : "Unknown error",
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : undefined) : undefined,
       }),
       {
         status: 500,
