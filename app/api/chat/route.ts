@@ -1,9 +1,13 @@
 import { createServerClient } from "@/lib/supabase/server"
-import { generateText } from "ai"
+import Anthropic from "@anthropic-ai/sdk"
 
 export const maxDuration = 60
 
 const RAILWAY_API_URL = "https://ai-vibes-mcp-server-production.up.railway.app"
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+})
 
 // Plan limits
 const PLAN_LIMITS = {
@@ -15,8 +19,6 @@ const PLAN_LIMITS = {
 type PlanType = keyof typeof PLAN_LIMITS
 
 async function getUserPlanAndUsage(userId: string) {
-  // Default values - assume free plan with plenty of queries for now
-  // since database tables may not exist yet
   return {
     plan: "free" as PlanType,
     limit: PLAN_LIMITS.free,
@@ -26,9 +28,71 @@ async function getUserPlanAndUsage(userId: string) {
 }
 
 function extractBrandFromMessage(message: string): string | null {
-  const trimmed = message.trim()
+  const commonBrands = [
+    "nike",
+    "apple",
+    "tesla",
+    "google",
+    "microsoft",
+    "amazon",
+    "meta",
+    "facebook",
+    "coca-cola",
+    "pepsi",
+    "mcdonalds",
+    "starbucks",
+    "netflix",
+    "disney",
+    "uber",
+    "airbnb",
+    "spotify",
+    "samsung",
+    "sony",
+    "adidas",
+    "puma",
+    "bmw",
+    "mercedes",
+    "toyota",
+    "ford",
+    "walmart",
+    "target",
+    "costco",
+    "ikea",
+    "lego",
+    "rolex",
+    "gucci",
+    "louis vuitton",
+    "chanel",
+    "hermes",
+    "zara",
+    "h&m",
+    "uniqlo",
+    "oracle",
+    "salesforce",
+    "adobe",
+    "intel",
+    "nvidia",
+    "amd",
+    "ibm",
+    "cisco",
+    "visa",
+    "mastercard",
+    "paypal",
+    "stripe",
+    "square",
+    "shopify",
+  ]
 
-  // Pattern-based extraction first
+  const lowerMessage = message.toLowerCase()
+
+  // Check for known brands first
+  for (const brand of commonBrands) {
+    if (lowerMessage.includes(brand)) {
+      return brand.charAt(0).toUpperCase() + brand.slice(1)
+    }
+  }
+
+  // Pattern-based extraction
   const patterns = [
     /(?:analyze|analizar|analysis of|análisis de)\s+["']?([A-Za-z0-9\s&-]+?)["']?(?:\s|$|,|\.|brand)/i,
     /(?:brand|marca)\s+["']?([A-Za-z0-9\s&-]+?)["']?/i,
@@ -47,14 +111,12 @@ function extractBrandFromMessage(message: string): string | null {
     }
   }
 
-  // If no pattern matched but the message is short (1-3 words) and looks like a brand name,
-  // treat the whole message as a brand name
+  // Short message handling (1-3 words)
+  const trimmed = message.trim()
   const words = trimmed.split(/\s+/)
   if (words.length <= 3 && words.length >= 1) {
-    // Check if it looks like a brand (starts with capital or is all lowercase, no special chars except &-)
     const potentialBrand = trimmed
     if (/^[A-Za-z0-9\s&-]+$/.test(potentialBrand) && potentialBrand.length >= 2) {
-      // Filter out common non-brand words
       const nonBrandWords = [
         "hello",
         "hi",
@@ -71,6 +133,15 @@ function extractBrandFromMessage(message: string): string | null {
         "ok",
         "thanks",
         "gracias",
+        "please",
+        "por favor",
+        "good",
+        "bad",
+        "bueno",
+        "malo",
+        "start",
+        "comenzar",
+        "empezar",
       ]
       if (!nonBrandWords.includes(potentialBrand.toLowerCase())) {
         return potentialBrand
@@ -81,22 +152,95 @@ function extractBrandFromMessage(message: string): string | null {
   return null
 }
 
+async function callAnthropicWithRetry(systemPrompt: string, userMessage: string, maxRetries = 3): Promise<string> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      console.log(`🔵 [Anthropic] Intento ${i + 1}/${maxRetries}`)
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2048,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userMessage }],
+      })
+
+      console.log("✅ [Anthropic] Respuesta exitosa")
+
+      if (response.content[0].type === "text") {
+        return response.content[0].text
+      }
+
+      throw new Error("Respuesta inesperada de Anthropic")
+    } catch (error: any) {
+      console.error(`❌ [Anthropic] Error intento ${i + 1}:`, {
+        message: error.message,
+        status: error.status,
+        type: error.type,
+      })
+
+      if (i === maxRetries - 1) {
+        throw new Error(`Anthropic failed after ${maxRetries} attempts: ${error.message}`)
+      }
+
+      // Exponential backoff
+      await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, i)))
+    }
+  }
+
+  throw new Error("Retry logic failed unexpectedly")
+}
+
+async function handleConversationalMode(message: string): Promise<string> {
+  console.log("💬 [CHAT] Modo conversacional activado")
+
+  const systemPrompt = `Eres un asistente experto en análisis de marca con inteligencia artificial. Tu nombre es AI Brand Analyst.
+
+Tu especialidad es ayudar a empresarios y marketers a entender cómo las diferentes plataformas de AI (ChatGPT, Claude, Gemini, Perplexity) perciben sus marcas.
+
+CAPACIDADES:
+- Analizar la percepción de cualquier marca mencionada
+- Proporcionar scores multidimensionales (Sentiment, Innovation, Trust, Sustainability, Value)
+- Dar insights estratégicos sobre posicionamiento de marca
+- Responder preguntas sobre branding y marketing digital
+
+INSTRUCCIONES:
+- Sé amigable y profesional
+- Si el usuario pregunta qué puedes hacer, explica tus capacidades
+- Si mencionan una marca, ofrécete a analizarla
+- Si preguntan algo fuera de tu especialidad, reconócelo pero intenta conectarlo con branding si es posible
+- Responde en el mismo idioma que el usuario
+- Usa un tono conversacional pero experto
+
+Responde de manera concisa y útil.`
+
+  try {
+    const responseText = await callAnthropicWithRetry(systemPrompt, message)
+    return responseText
+  } catch (error: any) {
+    console.error("❌ [CHAT] Error en modo conversacional:", error.message)
+    // Return helpful fallback
+    return `¡Hola! Soy tu AI Brand Analyst. Puedo ayudarte a analizar cómo cualquier marca es percibida por sistemas de AI como ChatGPT, Claude, Gemini y Perplexity.
+
+**Para empezar, simplemente menciona una marca:**
+- "Analiza Nike"
+- "¿Cómo perciben a Apple?"
+- "Tesla"
+- "Coca-Cola"
+
+Te proporcionaré un análisis completo incluyendo scores de visibilidad, análisis de sentimiento, SWOT y recomendaciones estratégicas.`
+  }
+}
+
 async function callRailwayAnalysis(brandName: string, competitors: string[] = []) {
   console.log("🔌 [Railway] Iniciando llamada para marca:", brandName)
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 30000) // 30s timeout
+  const timeoutId = setTimeout(() => controller.abort(), 30000)
 
   try {
-    console.log("🔌 [Railway] URL:", `${RAILWAY_API_URL}/analyze`)
-    console.log("🔌 [Railway] Body:", JSON.stringify({ brand_name: brandName, competitors, depth: "standard" }))
-
     const response = await fetch(`${RAILWAY_API_URL}/analyze`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      // Backend expects brand_name (snake_case)
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         brand_name: brandName,
         competitors,
@@ -115,31 +259,20 @@ async function callRailwayAnalysis(brandName: string, competitors: string[] = []
       } catch {
         errorText = `HTTP ${response.status}`
       }
-      console.error("❌ [Railway] Error response:", errorText)
       throw new Error(`Railway API error: ${response.status} - ${errorText}`)
     }
 
-    let result: any
-    try {
-      result = await response.json()
-    } catch {
-      console.error("❌ [Railway] JSON parse failed")
-      throw new Error("Invalid JSON response from Railway")
-    }
-
-    console.log("✅ [Railway] Result keys:", Object.keys(result))
+    const result = await response.json()
     console.log("✅ [Railway] Success:", result.success)
 
     if (result.success) {
       return result.data
     } else {
-      console.error("❌ [Railway] Analysis failed:", result.error)
       throw new Error(result.error || "Railway analysis failed")
     }
   } catch (error) {
     clearTimeout(timeoutId)
     if (error instanceof Error && error.name === "AbortError") {
-      console.error("❌ [Railway] Request timed out after 30s")
       throw new Error("Railway API request timed out after 30 seconds")
     }
     throw error
@@ -153,12 +286,10 @@ function formatAnalysisResponse(data: any, brandName: string): string {
 
   let response = `## Brand Analysis: ${brandName}\n\n`
 
-  // Handle consensus data from Railway response
   if (data.consensus) {
     if (data.consensus.overall_score !== undefined) {
       response += `**Overall AI Brand Score:** ${data.consensus.overall_score}/100\n\n`
     }
-
     if (data.consensus.scores) {
       response += `### Dimensional Scores\n`
       for (const [dimension, score] of Object.entries(data.consensus.scores)) {
@@ -167,31 +298,23 @@ function formatAnalysisResponse(data: any, brandName: string): string {
       }
       response += `\n`
     }
-
-    if (data.consensus.models_used && data.consensus.models_used.length > 0) {
+    if (data.consensus.models_used?.length > 0) {
       response += `*Models consulted: ${data.consensus.models_used.join(", ")}*\n\n`
     }
   }
 
-  // Handle individual model data
   if (data.models) {
-    // Show model warnings for errors
     const errors = Object.entries(data.models)
       .filter(([_, v]: [string, any]) => v.status === "error")
       .map(([k]) => k)
-
     if (errors.length > 0) {
       response += `> ⚠️ *Some models returned errors: ${errors.join(", ")}*\n\n`
     }
-
-    // Extract positioning from OpenAI if available
     const openaiData = data.models.openai?.data
     if (openaiData?.positioning) {
       response += `### Brand Positioning\n${openaiData.positioning}\n\n`
     }
-
-    // Extract attributes if available
-    if (openaiData?.attributes && openaiData.attributes.length > 0) {
+    if (openaiData?.attributes?.length > 0) {
       response += `### Key Attributes\n`
       openaiData.attributes.forEach((attr: string) => {
         response += `- ${attr}\n`
@@ -200,17 +323,8 @@ function formatAnalysisResponse(data: any, brandName: string): string {
     }
   }
 
-  // Legacy format support (in case Railway returns different structure)
   if (data.overall_score !== undefined && !data.consensus) {
     response += `**Overall AI Brand Score:** ${data.overall_score}/100\n\n`
-  }
-
-  if (data.ai_visibility && !data.consensus) {
-    response += `### AI Visibility Scores\n`
-    for (const [platform, score] of Object.entries(data.ai_visibility)) {
-      response += `- **${platform}:** ${score}/100\n`
-    }
-    response += `\n`
   }
 
   if (data.sentiment) {
@@ -218,14 +332,6 @@ function formatAnalysisResponse(data: any, brandName: string): string {
     response += `- Positive: ${data.sentiment.positive}%\n`
     response += `- Neutral: ${data.sentiment.neutral}%\n`
     response += `- Negative: ${data.sentiment.negative}%\n\n`
-  }
-
-  if (data.key_themes && data.key_themes.length > 0) {
-    response += `### Key Themes\n`
-    data.key_themes.forEach((theme: string) => {
-      response += `- ${theme}\n`
-    })
-    response += `\n`
   }
 
   if (data.swot) {
@@ -249,16 +355,11 @@ function formatAnalysisResponse(data: any, brandName: string): string {
     response += `\n`
   }
 
-  if (data.recommendations && data.recommendations.length > 0) {
+  if (data.recommendations?.length > 0) {
     response += `### Recommendations\n`
     data.recommendations.forEach((rec: string, i: number) => {
       response += `${i + 1}. ${rec}\n`
     })
-    response += `\n`
-  }
-
-  if (data.timestamp || data.analyzed_at) {
-    response += `---\n*Analysis generated at ${new Date(data.timestamp || data.analyzed_at).toLocaleString()}*`
   }
 
   return response
@@ -270,131 +371,28 @@ async function saveAnalysisResult(
   brandName: string,
   analysisData: any,
 ): Promise<void> {
-  console.log("💾 [Supabase] Iniciando guardado para:", brandName)
-
   try {
-    // Build schema-safe payload with only guaranteed columns
     const payload: Record<string, any> = {
       user_id: userId,
       brand_name: brandName,
       analyzed_at: new Date().toISOString(),
     }
-
-    // Add optional fields if they exist in the analysis data
     if (analysisData.overall_score !== undefined) {
       payload.rank = analysisData.overall_score
     }
-
-    if (analysisData.share_of_voice !== undefined) {
-      payload.share_of_voice = analysisData.share_of_voice
-    }
-
-    // Store dimensional scores (including competitors if present)
     const dimensionalScores: Record<string, any> = {}
-    if (analysisData.ai_visibility) {
-      dimensionalScores.ai_visibility = analysisData.ai_visibility
-    }
-    if (analysisData.sentiment) {
-      dimensionalScores.sentiment = analysisData.sentiment
-    }
-    if (analysisData.competitors && Array.isArray(analysisData.competitors)) {
-      // Store competitors inside dimensional_scores to avoid column issues
-      dimensionalScores.competitors = analysisData.competitors
-    }
-    if (Object.keys(dimensionalScores).length > 0) {
-      payload.dimensional_scores = dimensionalScores
-    }
-
-    // Store narrative analysis
-    if (analysisData.key_themes || analysisData.description) {
-      payload.narrative_analysis = {
-        key_themes: analysisData.key_themes || [],
-        description: analysisData.description || "",
-      }
-    }
-
-    // Store SWOT in threat_assessment
-    if (analysisData.swot) {
-      payload.threat_assessment = {
-        swot: analysisData.swot,
-      }
-    }
-
-    // Store recommendations
-    if (analysisData.recommendations && Array.isArray(analysisData.recommendations)) {
-      payload.recommendations = analysisData.recommendations
-    }
-
-    // Store executive summary if available
-    if (analysisData.summary || analysisData.executive_summary) {
-      payload.executive_summary = analysisData.summary || analysisData.executive_summary
-    }
-
-    // Store models used
-    if (analysisData.models_used) {
-      payload.models_used = analysisData.models_used
-    }
-
-    // Store processing time
-    if (analysisData.processing_time_seconds !== undefined) {
-      payload.processing_time_seconds = analysisData.processing_time_seconds
-    }
-
-    console.log("💾 [Supabase] Payload keys:", Object.keys(payload))
+    if (analysisData.ai_visibility) dimensionalScores.ai_visibility = analysisData.ai_visibility
+    if (analysisData.sentiment) dimensionalScores.sentiment = analysisData.sentiment
+    if (analysisData.competitors) dimensionalScores.competitors = analysisData.competitors
+    if (Object.keys(dimensionalScores).length > 0) payload.dimensional_scores = dimensionalScores
+    if (analysisData.swot) payload.threat_assessment = { swot: analysisData.swot }
+    if (analysisData.recommendations) payload.recommendations = analysisData.recommendations
 
     const { error } = await supabase.from("analysis_results").insert(payload)
-
-    if (error) {
-      // Log error but don't throw - we still want to return the response
-      console.error("❌ [Supabase] Insert error:", error.message, error.details, error.hint)
-    } else {
-      console.log("✅ [Supabase] Guardado exitoso para:", brandName)
-    }
+    if (error) console.error("❌ [Supabase] Insert error:", error.message)
+    else console.log("✅ [Supabase] Guardado exitoso")
   } catch (error) {
-    // Catch any unexpected errors - never fail the chat response
-    console.error("❌ [Supabase] Error inesperado:", error instanceof Error ? error.message : error)
-  }
-}
-
-async function conversationalResponse(message: string): Promise<string> {
-  console.log("💬 [Chat API] Iniciando respuesta conversacional")
-
-  const systemPrompt = `Eres un asistente especializado en análisis de marcas con AI. Tu nombre es AI Brand Analyst.
-
-Puedes:
-- Analizar cualquier marca mencionada (Nike, Apple, Tesla, Coca-Cola, etc.)
-- Proporcionar scores de percepción de marca basados en cómo los sistemas de AI (ChatGPT, Claude, Gemini, Perplexity) perciben las marcas
-- Dar recomendaciones estratégicas de branding
-- Responder preguntas sobre branding, marketing y posicionamiento de marca
-
-Para analizar una marca, el usuario solo necesita mencionarla en el chat.
-
-Responde de manera amigable y profesional. Si el usuario saluda, responde cordialmente y explica brevemente lo que puedes hacer. Si preguntan sobre tus capacidades, explícalas claramente.
-
-Siempre responde en el mismo idioma que el usuario.`
-
-  try {
-    const { text } = await generateText({
-      model: "anthropic/claude-sonnet-4-20250514",
-      system: systemPrompt,
-      prompt: message,
-      maxTokens: 1024,
-    })
-
-    console.log("✅ [Chat API] Respuesta conversacional generada")
-    return text
-  } catch (error) {
-    console.error("❌ [Chat API] Error en respuesta conversacional:", error)
-    // Fallback response if AI fails
-    return `¡Hola! Soy tu AI Brand Analyst. Puedo ayudarte a analizar cómo cualquier marca es percibida por sistemas de AI como ChatGPT, Claude, Gemini y Perplexity.
-
-**Para empezar, simplemente menciona una marca:**
-- "Analiza Nike"
-- "¿Cómo perciben a Apple?"
-- "Tesla"
-- "Coca-Cola"
-
-Te proporcionaré un análisis completo incluyendo scores de visibilidad, análisis de sentimiento, SWOT y recomendaciones estratégicas.`
+    console.error("❌ [Supabase] Error:", error instanceof Error ? error.message : error)
   }
 }
 
@@ -402,113 +400,90 @@ export async function POST(req: Request) {
   console.log("🔵 [Chat API] POST iniciado")
 
   let body: { message: string; conversationId?: string }
-
   try {
     body = await req.json()
-    console.log("📥 [Chat API] Body recibido:", JSON.stringify(body, null, 2))
+    console.log("📥 [Chat API] Message:", body.message)
   } catch (parseError) {
-    console.error("❌ [Chat API] Error parsing body:", parseError)
-    return new Response(
-      JSON.stringify({
-        error: "Invalid JSON body",
-        message: parseError instanceof Error ? parseError.message : "Parse error",
-      }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
-    )
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    })
   }
 
   const { message, conversationId } = body
 
-  console.log("🔌 [Chat API] Creando cliente Supabase...")
-  const supabase = await createServerClient()
+  if (!message || message.trim() === "") {
+    return new Response(JSON.stringify({ error: "Message is required" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    })
+  }
 
-  console.log("🔌 [Chat API] Obteniendo usuario...")
+  const supabase = await createServerClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) {
-    console.error("❌ [Chat API] Usuario no autenticado")
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
     })
   }
-  console.log("✅ [Chat API] Usuario autenticado:", user.id)
 
-  // Get plan info (simplified, doesn't require chat_messages table)
   const { used } = await getUserPlanAndUsage(user.id)
-  console.log("📥 [Chat API] Queries usadas:", used)
 
   try {
     const brandName = extractBrandFromMessage(message)
-    console.log("📥 [Chat API] Marca extraída:", brandName, "| Mensaje original:", message)
+    console.log("📥 [Chat API] Marca detectada:", brandName || "(ninguna - modo conversacional)")
 
     let responseText: string
 
     if (brandName) {
-      // Call Railway API for brand analysis
-      console.log("🔌 [Chat API] Iniciando análisis para marca:", brandName)
+      console.log("🏷️ [CHAT] Modo análisis de marca:", brandName)
       try {
         const analysisData = await callRailwayAnalysis(brandName)
-        console.log("✅ [Chat API] Análisis completado, formateando respuesta...")
         responseText = formatAnalysisResponse(analysisData, brandName)
 
-        console.log("💾 [Chat API] Guardando resultado en background...")
         saveAnalysisResult(supabase, user.id, brandName, analysisData).catch((err) => {
-          console.error("❌ [Chat API] Background save failed:", err)
+          console.error("❌ Background save failed:", err)
         })
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error"
-        console.error("❌ [Chat API] Error en análisis Railway:", errorMessage)
-
+        console.error("❌ [Railway] Error:", errorMessage)
         responseText = `## Unable to Analyze "${brandName}"
 
-I encountered an issue while trying to analyze this brand. This could happen because:
+I encountered an issue while analyzing this brand. Please try again in a few moments.
 
-1. **The analysis service is temporarily unavailable** - Please try again in a few moments
-2. **Network connectivity issues** - The service might be experiencing high load
-
-**What you can try:**
-- Wait a moment and try again
-- Try a different brand to test connectivity
-
-*Technical details: ${errorMessage}*`
+*Error: ${errorMessage}*`
       }
     } else {
-      console.log("💬 [Chat API] No se detectó marca, usando modo conversacional")
-      responseText = await conversationalResponse(message)
+      console.log("💬 [CHAT] Modo conversacional")
+      responseText = await handleConversationalMode(message)
     }
 
-    console.log("✅ [Chat API] Enviando respuesta exitosa")
     return new Response(
       JSON.stringify({
         response: responseText,
         conversationId,
         used: used + 1,
+        mode: brandName ? "brand_analysis" : "conversational",
+        brand: brandName || undefined,
       }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
+      { status: 200, headers: { "Content-Type": "application/json" } },
     )
   } catch (error) {
-    console.error("❌ [Chat API] Error general:", error)
+    console.error("❌ [Chat API] Error crítico:", error)
     return new Response(
       JSON.stringify({
-        error: "Failed to process message",
+        error: "Internal server error",
         message: error instanceof Error ? error.message : "Unknown error",
-        stack: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : undefined) : undefined,
       }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
+      { status: 500, headers: { "Content-Type": "application/json" } },
     )
   }
 }
 
-// GET endpoint to check user's usage
 export async function GET() {
   const supabase = await createServerClient()
   const {
@@ -523,7 +498,6 @@ export async function GET() {
   }
 
   const usage = await getUserPlanAndUsage(user.id)
-
   return new Response(JSON.stringify(usage), {
     status: 200,
     headers: { "Content-Type": "application/json" },
